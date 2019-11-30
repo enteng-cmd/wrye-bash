@@ -532,7 +532,7 @@ class Path(object):
     @property
     def headTail(self):
         """For alpha\beta.gamma returns (alpha,beta.gamma)"""
-        return map(GPath,(self.shead,self.stail))
+        return [GPath(self.shead), GPath(self.stail)]
     @property
     def head(self):
         """For alpha\beta.gamma, returns alpha."""
@@ -624,7 +624,8 @@ class Path(object):
             join = os.path.join
             op_size = os.path.getsize
             try:
-                return sum([sum(map(op_size,map(lambda z: join(x,z),files))) for x,y,files in _walk(self._s)])
+                return sum(sum(op_size(join(x, f)) for f in files)
+                           for x, _y, files in _walk(self._s))
             except ValueError:
                 return 0
         else:
@@ -1250,8 +1251,8 @@ class MemorySet(object):
     def __iter__(self):
         for i,elem in enumerate(self.items):
             if self.mask[i]: yield self.items[i]
-    def __str__(self): return u'{%s}' % (','.join(map(repr,self._items())))
-    def __repr__(self): return u'MemorySet([%s])' % (','.join(map(repr,self._items())))
+    def __str__(self): return u'{%s}' % (','.join(repr(i) for i in self._items()))
+    def __repr__(self): return u'MemorySet([%s])' % (','.join(repr(i) for i in self._items()))
     def forget(self, elem):
         # Permanently remove an item from the list.  Don't remember its order
         if elem in self.items:
@@ -2162,7 +2163,7 @@ class WryeText(object):
         # Setup
         outWrite = out.write
 
-        cssDirs = map(GPath,cssDirs)
+        cssDirs = (GPath(d) for d in cssDirs)
         # Setup ---------------------------------------------------------
         #--Headers
         reHead = re.compile(u'(=+) *(.+)',re.U)

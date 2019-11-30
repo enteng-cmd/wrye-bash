@@ -1332,7 +1332,8 @@ class FidReplacer(object):
                 oldEid = _coerce(oldEid, unicode, AllowNone=True)
                 newEid = _coerce(newEid, unicode, AllowNone=True)
                 newMod = _coerce(newMod, unicode)
-                oldMod,newMod = map(GPath,(oldMod,newMod))
+                oldMod = GPath(oldMod)
+                newMod = GPath(newMod)
                 oldId = (
                     GPath(aliases.get(oldMod,oldMod)),_coerce(oldObj,int,16))
                 newId = (
@@ -1411,7 +1412,8 @@ class CBash_FidReplacer(object):
                 oldEid = _coerce(oldEid, unicode)
                 newEid = _coerce(newEid, unicode, AllowNone=True)
                 newMod = _coerce(newMod, unicode, AllowNone=True)
-                oldMod,newMod = map(GPath,(oldMod,newMod))
+                oldMod = GPath(oldMod)
+                newMod = GPath(newMod)
                 oldId = FormID(GPath(aliases.get(oldMod,oldMod)),
                                _coerce(oldObj,int,16))
                 newId = FormID(GPath(aliases.get(newMod,newMod)),
@@ -1749,7 +1751,8 @@ class ItemStats(object):
         for group, attrs in self.class_attrs.iteritems():
             for record in getattr(modFile,group).getActiveRecords():
                 self.class_fid_attr_value[group][record.fid].update(
-                    zip(attrs, map(record.__getattribute__, attrs)))
+                    zip(attrs, (getattr(record, a) for a in attrs))
+                )
 
     def writeToMod(self,modInfo):
         """Writes stats to specified mod."""
@@ -1764,7 +1767,7 @@ class ItemStats(object):
                 longid = record.fid
                 itemStats = fid_attr_value.get(longid,None)
                 if not itemStats: continue
-                oldValues = dict(zip(attrs,map(record.__getattribute__,attrs)))
+                oldValues = dict(zip(attrs,(getattr(record,a) for a in attrs)))
                 for stat_key, n_stat in itemStats.iteritems():
                     o_stat = oldValues[stat_key]
                     if isinstance(o_stat, float) or isinstance(n_stat, float):
@@ -1838,7 +1841,7 @@ class ItemStats(object):
                     out.write(
                         u'"%s","%s","0x%06X",' % (group,longid[0].s,longid[1]))
                     attr_value = fid_attr_value[longid]
-                    write(out, attrs, map(attr_value.get, attrs))
+                    write(out, attrs, [attr_value.get(a) for a in attrs])
 
 class CBash_ItemStats(object):
     """Statistics for armor and weapons, with functions for
@@ -1887,7 +1890,8 @@ class CBash_ItemStats(object):
             for group, attrs in self.class_attrs.iteritems():
                 for record in getattr(modFile,group):
                     self.class_fid_attr_value[group][record.fid].update(
-                        zip(attrs,map(record.__getattribute__,attrs)))
+                        zip(attrs, (getattr(record, a) for a in attrs))
+                    )
 
     def writeToMod(self,modInfo):
         """Exports type_id_name to specified mod."""
@@ -1903,7 +1907,8 @@ class CBash_ItemStats(object):
                     record = modFile.LookupRecord(fid)
                     if record and record._Type == group:
                         oldValues = dict(
-                            zip(attrs,map(record.__getattribute__,attrs)))
+                            zip(attrs, (getattr(record, a) for a in attrs))
+                        )
                         if oldValues != attr_value:
                             for attr, value in attr_value.iteritems():
                                 setattr(record,attr,value)
@@ -1964,7 +1969,7 @@ class CBash_ItemStats(object):
                     out.write(
                         u'"%s","%s","0x%06X",' % (group,longid[0],longid[1]))
                     attr_value = fid_attr_value[longid]
-                    write(out, attrs, map(attr_value.get, attrs))
+                    write(out, attrs, [attr_value.get(a) for a in attrs])
 
 #------------------------------------------------------------------------------
 class _ScriptText(object):
@@ -2606,8 +2611,7 @@ class ItemPrices(_ItemPrices):
         attrs = self.item_prices_attrs
         for group, fid_stats in class_fid_stats.iteritems():
             for record in getattr(modFile,group).getActiveRecords():
-                fid_stats[mapper(record.fid)] = map(record.__getattribute__,
-                                                    attrs)
+                fid_stats[mapper(record.fid)] = [getattr(record, a) for a in attrs]
 
     def writeToMod(self,modInfo):
         """Writes stats to specified mod."""
@@ -2681,7 +2685,7 @@ class CBash_ItemPrices(_ItemPrices):
             Current.load()
             for group, fid_stats in class_fid_stats.iteritems():
                 for record in getattr(modFile,group):
-                    fid_stats[record.fid] = map(record.__getattribute__,attrs)
+                    fid_stats[record.fid] = [getattr(record, a) for a in attrs]
 
     def writeToMod(self,modInfo):
         """Writes stats to specified mod."""
@@ -2977,7 +2981,7 @@ class CBash_SpellRecords(_UsesEffectsMixin):
             modFile = Current.addMod(modInfo.getPath().stail,LoadMasters=False)
             Current.load()
             for record in modFile.SPEL:
-                fid_stats[record.fid] = map(record.__getattribute__, attrs)
+                fid_stats[record.fid] = [getattr(record, a) for a in attrs]
 
     def writeToMod(self,modInfo):
         """Writes stats to specified mod."""
@@ -2990,10 +2994,11 @@ class CBash_SpellRecords(_UsesEffectsMixin):
                 newStats = fid_stats.get(record.fid, None)
                 if not newStats: continue
                 if not ValidateList(newStats, modFile): continue
-                oldStats = map(record.__getattribute__,attrs)
+                oldStats = [getattr(record, a) for a in attrs]
                 if oldStats != newStats:
                     changed.append(oldStats[0]) #eid
-                    map(record.__setattr__,attrs,newStats)
+                    for attr, value in zip(attrs, newStats):
+                        setattr(record, attr, value)
             #--Done
             if changed: modFile.save()
             return changed
