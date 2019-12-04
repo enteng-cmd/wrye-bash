@@ -103,9 +103,9 @@ class ConfigHelpers(object):
     @staticmethod
     def getDirtyMessage(modName, mod_infos):
         if lootDb.is_plugin_dirty(modName, mod_infos):
-            return True, 'Contains dirty edits, needs cleaning.'
+            return True, u'Contains dirty edits, needs cleaning.'
         else:
-            return False, ''
+            return False, u''
 
     # BashTags dir ------------------------------------------------------------
     def get_tags_from_dir(self, plugin_name):
@@ -539,9 +539,9 @@ class ModCleaner(object):
                             header = insUnpackRecHeader()
                             rtype,hsize = header.recType,header.size
                             #(type,size,flags,fid,uint2) = ins.unpackRecHeader()
-                            if rtype == 'GRUP':
+                            if rtype == b'GRUP':
                                 groupType = header.groupType
-                                if groupType == 0 and header.label not in {'CELL','WRLD'}:
+                                if groupType == 0 and header.label not in {b'CELL',b'WRLD'}:
                                     # Skip Tops except for WRLD and CELL groups
                                     insRead(hsize-headerSize)
                                 elif detailed:
@@ -562,9 +562,9 @@ class ModCleaner(object):
                                         pass
                             else:
                                 if doUDR and header.flags1 & 0x20 and rtype in (
-                                    'ACRE',               #--Oblivion only
-                                    'ACHR','REFR',        #--Both
-                                    'NAVM','PHZD','PGRE', #--Skyrim only
+                                    b'ACRE',               #--Oblivion only
+                                    b'ACHR',b'REFR',        #--Both
+                                    b'NAVM',b'PHZD',b'PGRE', #--Skyrim only
                                     ):
                                     if not detailed:
                                         udr[header.fid] = ModCleaner.UdrInfo(header.fid)
@@ -576,14 +576,14 @@ class ModCleaner(object):
                                         if parentParentFid:
                                             parents_to_scan.setdefault(parentParentFid,set())
                                             parents_to_scan[parentParentFid].add(fid)
-                                if doFog and rtype == 'CELL':
+                                if doFog and rtype == b'CELL':
                                     nextRecord = insTell() + hsize
                                     while insTell() < nextRecord:
                                         (nextType,nextSize) = insUnpackSubHeader()
-                                        if nextType != 'XCLL':
+                                        if nextType != b'XCLL':
                                             insRead(nextSize)
                                         else:
-                                            color,near,far,rotXY,rotZ,fade,clip = ins_unpack(nextSize,'CELL.XCLL')
+                                            color,near,far,rotXY,rotZ,fade,clip = ins_unpack(nextSize,b'CELL.XCLL')
                                             if not (near or far or clip):
                                                 fog.add(header.fid)
                                 else:
@@ -596,8 +596,8 @@ class ModCleaner(object):
                                 subprogress(baseSize+insTell())
                                 header = insUnpackRecHeader()
                                 rtype,hsize = header.recType,header.size
-                                if rtype == 'GRUP':
-                                    if header.groupType == 0 and header.label not in {'CELL','WRLD'}:
+                                if rtype == b'GRUP':
+                                    if header.groupType == 0 and header.label not in {b'CELL',b'WRLD'}:
                                         insRead(hsize-headerSize)
                                 else:
                                     fid = header.fid
@@ -606,18 +606,18 @@ class ModCleaner(object):
                                         record.loadSubrecords()
                                         eid = u''
                                         for subrec in record.subrecords:
-                                            if subrec.subType == 'EDID':
+                                            if subrec.subType == b'EDID':
                                                 eid = bolt.decode(subrec.data)
-                                            elif subrec.subType == 'XCLC':
+                                            elif subrec.subType == b'XCLC':
                                                 pos = struct_unpack(
                                                     '=2i', subrec.data[:8])
                                         for udrFid in parents_to_scan[fid]:
-                                            if rtype == 'CELL':
+                                            if rtype == b'CELL':
                                                 udr[udrFid].parentEid = eid
                                                 if udr[udrFid].parentType == 1:
                                                     # Exterior Cell, calculate position
                                                     udr[udrFid].pos = pos
-                                            elif rtype == 'WRLD':
+                                            elif rtype == b'WRLD':
                                                 udr[udrFid].parentParentEid = eid
                                     else:
                                         insRead(hsize)
@@ -662,22 +662,22 @@ class NvidiaFogFixer(object):
                     type,size = header.recType,header.size
                     #(type,size,str0,fid,uint2) = ins.unpackRecHeader()
                     copyPrev(RecordHeader.rec_header_size)
-                    if type == 'GRUP':
+                    if type == u'GRUP':
                         if header.groupType != 0: #--Ignore sub-groups
                             pass
-                        elif header.label not in ('CELL','WRLD'):
+                        elif header.label not in (u'CELL',u'WRLD'):
                             copy(size - RecordHeader.rec_header_size)
                     #--Handle cells
-                    elif type == 'CELL':
+                    elif type == b'CELL':
                         nextRecord = ins.tell() + size
                         while ins.tell() < nextRecord:
                             (type,size) = ins.unpackSubHeader()
                             copyPrev(6)
-                            if type != 'XCLL':
+                            if type != b'XCLL':
                                 copy(size)
                             else:
                                 color, near, far, rotXY, rotZ, fade, clip = \
-                                    ins_unpack(size, 'CELL.XCLL')
+                                    ins_unpack(size, b'CELL.XCLL')
                                 if not (near or far or clip):
                                     near = 0.0001
                                     fixedCells.add(header.fid)
@@ -721,16 +721,16 @@ class ModDetails(object):
             while not ins.atEnd():
                 header = ins.unpackRecHeader()
                 recType, rec_siz = header.recType, header.size
-                if recType == 'GRUP':
+                if recType == b'GRUP':
                     # FIXME(ut): monkey patch for fallout QUST GRUP
                     if bush.game.fsName in (u'Fallout4', u'Fallout4VR') and \
                             header.groupType == 10:
                         header.skip_group(ins)
                         continue
                     label = header.label
-                    progress(1.0*ins.tell()/modInfo.size,_(u"Scanning: ")+label)
+                    progress(1.0*ins.tell()/modInfo.size,_(u'Scanning: ')+label)
                     records = group_records.setdefault(label,[])
-                    if label in ('CELL', 'WRLD', 'DIAL'): # skip these groups
+                    if label in (b'CELL', b'WRLD', b'DIAL'): #skip these groups
                         header.skip_group(ins)
                 else:
                     eid = u''
@@ -738,7 +738,7 @@ class ModDetails(object):
                     recs, endRecs = getRecordReader(header.flags1, rec_siz)
                     while recs.tell() < endRecs:
                         (recType, rec_siz) = recs.unpackSubHeader()
-                        if recType == 'EDID':
+                        if recType == b'EDID':
                             eid = recs.readString(rec_siz)
                             break
                         recs.seek(rec_siz, 1)
