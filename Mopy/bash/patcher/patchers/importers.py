@@ -242,8 +242,8 @@ class _RecTypeModLogging(CBash_ImportPatcher):
             self._srcMods(log)
             log(self.__class__.logMsg)
         for group_sig in sorted(mod_count.keys()):
-            log(self.__class__.logModRecs % {'type': u'%s ' % group_sig,
-                              'count': sum(mod_count[group_sig].values())})
+            log(self.__class__.logModRecs % {u'type': u'%s ' % group_sig,
+                              u'count': sum(mod_count[group_sig].values())})
             for srcMod in load_order.get_ordered(mod_count[group_sig].keys()):
                 log(u'  * %s: %d' % (srcMod.s, mod_count[group_sig][srcMod]))
         self.mod_count = defaultdict(Counter)
@@ -261,7 +261,7 @@ class _RecTypeModLogging(CBash_ImportPatcher):
 # Patchers: 20 ----------------------------------------------------------------
 class CellImporter(ImportPatcher):
     logMsg = u'\n=== ' + _(u'Cells/Worlds Patched')
-    _read_write_records = ('CELL', 'WRLD')
+    _read_write_records = (b'CELL', b'WRLD')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CellImporter, self).__init__(p_name, p_file, p_sources)
@@ -289,7 +289,7 @@ class CellImporter(ImportPatcher):
                     tempCellData[fid][attr] = cellBlock.cell.__getattribute__(
                         attr)
                 for flg_ in flgs_:
-                    tempCellData[fid + ('flags',)][
+                    tempCellData[fid + (u'flags',)][
                         flg_] = cellBlock.cell.flags.__getattr__(flg_)
         def checkMasterCellBlockData(cellBlock):
             """
@@ -308,11 +308,11 @@ class CellImporter(ImportPatcher):
                         cellData[rec_fid][attr] = tempCellData[rec_fid][attr]
                 for flg_ in flgs_:
                     master_flag = cellBlock.cell.flags.__getattr__(flg_)
-                    if tempCellData[rec_fid + ('flags',)][flg_] != master_flag:
-                        cellData[rec_fid + ('flags',)][flg_] = \
-                            tempCellData[rec_fid + ('flags',)][flg_]
-        loadFactory = LoadFactory(False,MreRecord.type_class['CELL'],
-                                        MreRecord.type_class['WRLD'])
+                    if tempCellData[rec_fid + (u'flags',)][flg_] != master_flag:
+                        cellData[rec_fid + (u'flags',)][flg_] = \
+                            tempCellData[rec_fid + (u'flags',)][flg_]
+        loadFactory = LoadFactory(False,MreRecord.type_class[b'CELL'],
+                                        MreRecord.type_class[b'WRLD'])
         progress.setFull(len(self.srcs))
         cachedMasters = {}
         minfs = self.patchFile.p_file_minfos
@@ -327,7 +327,7 @@ class CellImporter(ImportPatcher):
             srcInfo = minfs[srcMod]
             srcFile = ModFile(srcInfo,loadFactory)
             srcFile.load(True)
-            srcFile.convertToLongFids(('CELL','WRLD'))
+            srcFile.convertToLongFids((b'CELL',b'WRLD'))
             cachedMasters[srcMod] = srcFile
             bashTags = srcInfo.getBashTags()
             # print bashTags
@@ -337,10 +337,10 @@ class CellImporter(ImportPatcher):
                 self.recAttrs[bashKey] for bashKey in tags))
             flgs_ = tuple(self.recFlags[bashKey] for bashKey in tags if
                           self.recFlags[bashKey] != u'')
-            if 'CELL' in srcFile.tops:
+            if b'CELL' in srcFile.tops:
                 for cellBlock in srcFile.CELL.cellBlocks:
                     importCellBlockData(cellBlock)
-            if 'WRLD' in srcFile.tops:
+            if b'WRLD' in srcFile.tops:
                 for worldBlock in srcFile.WRLD.worldBlocks:
                     for cellBlock in worldBlock.cellBlocks:
                         importCellBlockData(cellBlock)
@@ -357,12 +357,12 @@ class CellImporter(ImportPatcher):
                     masterInfo = minfs[master]
                     masterFile = ModFile(masterInfo,loadFactory)
                     masterFile.load(True)
-                    masterFile.convertToLongFids(('CELL','WRLD'))
+                    masterFile.convertToLongFids((b'CELL',b'WRLD'))
                     cachedMasters[master] = masterFile
-                if 'CELL' in masterFile.tops:
+                if b'CELL' in masterFile.tops:
                     for cellBlock in masterFile.CELL.cellBlocks:
                         checkMasterCellBlockData(cellBlock)
-                if 'WRLD' in masterFile.tops:
+                if b'WRLD' in masterFile.tops:
                     for worldBlock in masterFile.WRLD.worldBlocks:
                         for cellBlock in worldBlock.cellBlocks:
                             checkMasterCellBlockData(cellBlock)
@@ -377,17 +377,17 @@ class CellImporter(ImportPatcher):
     def scanModFile(self, modFile, progress): # scanModFile0
         """Add lists from modFile."""
         if not self.isActive or (
-                'CELL' not in modFile.tops and 'WRLD' not in modFile.tops):
+                b'CELL' not in modFile.tops and b'WRLD' not in modFile.tops):
             return
         cellData = self.cellData
         patchCells = self.patchFile.CELL
         patchWorlds = self.patchFile.WRLD
-        modFile.convertToLongFids(('CELL','WRLD'))
-        if 'CELL' in modFile.tops:
+        modFile.convertToLongFids((b'CELL',b'WRLD'))
+        if b'CELL' in modFile.tops:
             for cellBlock in modFile.CELL.cellBlocks:
                 if cellBlock.cell.fid in cellData:
                     patchCells.setCell(cellBlock.cell)
-        if 'WRLD' in modFile.tops:
+        if b'WRLD' in modFile.tops:
             for worldBlock in modFile.WRLD.worldBlocks:
                 for cellBlock in worldBlock.cellBlocks:
                     if cellBlock.cell.fid in cellData:
@@ -423,7 +423,7 @@ class CellImporter(ImportPatcher):
                         patchCellBlock.cell.__setattr__(attr, value)
                         modified=True
             for flag, value in cellData[
-                patch_cell_fid + ('flags',)].iteritems():
+                patch_cell_fid + (u'flags',)].iteritems():
                 if patchCellBlock.cell.flags.__getattr__(flag) != value:
                     patchCellBlock.cell.flags.__setattr__(flag, value)
                     modified=True
@@ -469,7 +469,7 @@ class CellImporter(ImportPatcher):
 
 class CBash_CellImporter(CBash_ImportPatcher):
     logMsg = u'* ' + _(u'Cells/Worlds Patched') + u': %d'
-    _read_write_records = ('CELLS',)
+    _read_write_records = (b'CELLS',)
     tag_attrs = {
         u'C.Climate': ('climate', 'IsBehaveLikeExterior'),
         u'C.Music': ('musicType',),
@@ -604,41 +604,41 @@ class GraphicsPatcher(_SimpleImporter):
 
 class CBash_GraphicsPatcher(_RecTypeModLogging):
     _read_write_records = (
-        'BSGN', 'LSCR', 'CLAS', 'LTEX', 'REGN', 'ACTI', 'DOOR', 'FLOR', 'FURN',
-        'GRAS', 'STAT', 'ALCH', 'AMMO', 'APPA', 'BOOK', 'INGR', 'KEYM', 'LIGH',
-        'MISC', 'SGST', 'SLGM', 'WEAP', 'TREE', 'ARMO', 'CLOT', 'CREA', 'MGEF',
-        'EFSH')
+        b'BSGN', b'LSCR', b'CLAS', b'LTEX', b'REGN', b'ACTI', b'DOOR', b'FLOR',
+        b'FURN', b'GRAS', b'STAT', b'ALCH', b'AMMO', b'APPA', b'BOOK', b'INGR',
+        b'KEYM', b'LIGH', b'MISC', b'SGST', b'SLGM', b'WEAP', b'TREE', b'ARMO',
+        b'CLOT', b'CREA', b'MGEF', b'EFSH')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_GraphicsPatcher, self).__init__(p_name, p_file, p_sources)
-        model = ('modPath','modb','modt_p')
-        icon = ('iconPath',)
+        model = (u'modPath', u'modb', u'modt_p')
+        icon = (u'iconPath',)
         class_attrs = self.class_attrs = dict.fromkeys(
-            ['BSGN', 'LSCR', 'CLAS', 'LTEX', 'REGN'], icon)
+            [b'BSGN', b'LSCR', b'CLAS', b'LTEX', b'REGN'], icon)
         class_attrs.update(dict.fromkeys(
-            ['ACTI', 'DOOR', 'FLOR', 'FURN', 'GRAS', 'STAT'], model))
+            [b'ACTI', b'DOOR', b'FLOR', b'FURN', b'GRAS', b'STAT'], model))
         class_attrs.update(dict.fromkeys(
-            ['ALCH', 'AMMO', 'APPA', 'BOOK', 'INGR', 'KEYM', 'LIGH', 'MISC',
-             'SGST', 'SLGM', 'WEAP', 'TREE'], icon + model))
-        class_attrs['CLOT'] = class_attrs['ARMO'] = (
-            'maleBody_list', 'maleWorld_list', 'maleIconPath',
-            'femaleBody_list', 'femaleWorld_list', 'femaleIconPath', 'flags')
-        class_attrs['CREA'] = ('bodyParts', 'nift_p')
-        class_attrs['MGEF'] = icon + model + ('effectShader',
-                                              'enchantEffect','light')
-        class_attrs['EFSH'] = ('fillTexturePath','particleTexturePath','flags','memSBlend','memBlendOp',
-                               'memZFunc','fillRed','fillGreen','fillBlue','fillAIn','fillAFull',
-                               'fillAOut','fillAPRatio','fillAAmp','fillAFreq','fillAnimSpdU',
-                               'fillAnimSpdV','edgeOff','edgeRed','edgeGreen','edgeBlue','edgeAIn',
-                               'edgeAFull','edgeAOut','edgeAPRatio','edgeAAmp','edgeAFreq',
-                               'fillAFRatio','edgeAFRatio','memDBlend','partSBlend','partBlendOp',
-                               'partZFunc','partDBlend','partBUp','partBFull','partBDown',
-                               'partBFRatio','partBPRatio','partLTime','partLDelta','partNSpd',
-                               'partNAcc','partVel1','partVel2','partVel3','partAcc1','partAcc2',
-                               'partAcc3','partKey1','partKey2','partKey1Time','partKey2Time',
-                               'key1Red','key1Green','key1Blue','key2Red','key2Green','key2Blue',
-                               'key3Red','key3Green','key3Blue','key1A','key2A','key3A',
-                               'key1Time','key2Time','key3Time')
+            [b'ALCH', b'AMMO', b'APPA', b'BOOK', b'INGR', b'KEYM', b'LIGH', b'MISC',
+             b'SGST', b'SLGM', b'WEAP', b'TREE'], icon + model))
+        class_attrs[b'CLOT'] = class_attrs[b'ARMO'] = (
+            u'maleBody_list', u'maleWorld_list', u'maleIconPath',
+            u'femaleBody_list', u'femaleWorld_list', u'femaleIconPath', u'flags')
+        class_attrs[b'CREA'] = (u'bodyParts', u'nift_p')
+        class_attrs[b'MGEF'] = icon + model + (u'effectShader',
+                                              u'enchantEffect',u'light')
+        class_attrs[b'EFSH'] = (u'fillTexturePath',u'particleTexturePath',u'flags',u'memSBlend',u'memBlendOp',
+                               u'memZFunc',u'fillRed',u'fillGreen',u'fillBlue',u'fillAIn',u'fillAFull',
+                               u'fillAOut',u'fillAPRatio',u'fillAAmp',u'fillAFreq',u'fillAnimSpdU',
+                               u'fillAnimSpdV',u'edgeOff',u'edgeRed',u'edgeGreen',u'edgeBlue',u'edgeAIn',
+                               u'edgeAFull',u'edgeAOut',u'edgeAPRatio',u'edgeAAmp',u'edgeAFreq',
+                               u'fillAFRatio',u'edgeAFRatio',u'memDBlend',u'partSBlend',u'partBlendOp',
+                               u'partZFunc',u'partDBlend',u'partBUp',u'partBFull',u'partBDown',
+                               u'partBFRatio',u'partBPRatio',u'partLTime',u'partLDelta',u'partNSpd',
+                               u'partNAcc',u'partVel1',u'partVel2',u'partVel3',u'partAcc1',u'partAcc2',
+                               u'partAcc3',u'partKey1',u'partKey2',u'partKey1Time',u'partKey2Time',
+                               u'key1Red',u'key1Green',u'key1Blue',u'key2Red',u'key2Green',u'key2Blue',
+                               u'key3Red',u'key3Green',u'key3Blue',u'key1A',u'key2A',u'key3A',
+                               u'key1Time',u'key2Time',u'key3Time')
 
     def apply(self,modFile,record,bashTags):
         """Edits patch file as desired."""
@@ -678,51 +678,52 @@ class ActorImporter(_SimpleImporter):
             type_count, _attrgetters, __setattr)
 
 class CBash_ActorImporter(_RecTypeModLogging):
-    _read_write_records = ('CREA', 'NPC_')
+    _read_write_records = (b'CREA', b'NPC_')
     class_tag_attrs = {
-      'NPC_': {
-        u'Actors.AIData': ('aggression', 'confidence', 'energyLevel',
-            'responsibility', 'services', 'trainSkill', 'trainLevel'),
-        u'Actors.Stats': ('armorer', 'athletics', 'blade', 'block', 'blunt',
-            'h2h', 'heavyArmor', 'alchemy', 'alteration', 'conjuration',
-            'destruction', 'illusion', 'mysticism', 'restoration',
-            'acrobatics', 'lightArmor', 'marksman', 'mercantile', 'security',
-            'sneak', 'speechcraft', 'health', 'strength', 'intelligence',
-            'willpower', 'agility', 'speed', 'endurance', 'personality',
-            'luck',),
-        u'Actors.ACBS': (('baseSpell', 'fatigue', 'level', 'calcMin',
-                          'calcMax', 'IsPCLevelOffset', 'IsAutoCalc',),
-            'barterGold', 'IsFemale', 'IsEssential', 'IsRespawn',
-            'IsNoLowLevel', 'IsNoRumors', 'IsSummonable', 'IsNoPersuasion',
-            'IsCanCorpseCheck',),
-        u'NPC.Class': ('iclass',),
-        u'NPC.Race': ('race',),
-        u'Actors.CombatStyle': ('combatStyle',),
+      b'NPC_': {
+        u'Actors.AIData': (u'aggression', u'confidence', u'energyLevel',
+            u'responsibility', u'services', u'trainSkill', u'trainLevel'),
+        u'Actors.Stats': (
+            u'armorer', u'athletics', u'blade', u'block', u'blunt', u'h2h',
+            u'heavyArmor', u'alchemy', u'alteration', u'conjuration',
+            u'destruction', u'illusion', u'mysticism', u'restoration',
+            u'acrobatics', u'lightArmor', u'marksman', u'mercantile',
+            u'security', u'sneak', u'speechcraft', u'health', u'strength',
+            u'intelligence', u'willpower', u'agility', u'speed', u'endurance',
+            u'personality', u'luck'),
+        u'Actors.ACBS': (
+            (u'baseSpell', u'fatigue', u'level', u'calcMin', u'calcMax',
+             u'IsPCLevelOffset', u'IsAutoCalc'), u'barterGold', u'IsFemale',
+            u'IsEssential', u'IsRespawn', u'IsNoLowLevel', u'IsNoRumors',
+            u'IsSummonable', u'IsNoPersuasion', u'IsCanCorpseCheck'),
+        u'NPC.Class': (u'iclass',),
+        u'NPC.Race': (u'race',),
+        u'Actors.CombatStyle': (u'combatStyle',),
         u'Creatures.Blood': (),
         u'Creatures.Type': (),
-        u'Actors.Skeleton': ('modPath', 'modb', 'modt_p'),
+        u'Actors.Skeleton': (u'modPath', u'modb', u'modt_p'),
       },
-      'CREA': {
+      b'CREA': {
         u'Actors.AIData': (
-            'aggression', 'confidence', 'energyLevel', 'responsibility',
-            'services', 'trainSkill', 'trainLevel'),
+            u'aggression', u'confidence', u'energyLevel', u'responsibility',
+            u'services', u'trainSkill', u'trainLevel'),
             u'Actors.Stats': (
-            'combat', 'magic', 'stealth', 'soulType', 'health', 'attackDamage',
-            'strength', 'intelligence', 'willpower', 'agility', 'speed',
-            'endurance', 'personality', 'luck'),
-            u'Actors.ACBS': (('baseSpell', 'fatigue', 'level', 'calcMin',
-                              'calcMax', 'IsPCLevelOffset',),
-            'barterGold', 'IsBiped', 'IsEssential', 'IsWeaponAndShield',
-            'IsRespawn', 'IsSwims', 'IsFlies', 'IsWalks', 'IsNoLowLevel',
-            'IsNoBloodSpray', 'IsNoBloodDecal', 'IsNoHead', 'IsNoRightArm',
-            'IsNoLeftArm', 'IsNoCombatInWater', 'IsNoShadow',
-            'IsNoCorpseCheck',),
+            u'combat', u'magic', u'stealth', u'soulType', u'health',
+            u'attackDamage', u'strength', u'intelligence', u'willpower',
+            u'agility', u'speed', u'endurance', u'personality', u'luck'),
+            u'Actors.ACBS': ((u'baseSpell', u'fatigue', u'level', u'calcMin',
+                              u'calcMax', u'IsPCLevelOffset',),
+            u'barterGold', u'IsBiped', u'IsEssential', u'IsWeaponAndShield',
+            u'IsRespawn', u'IsSwims', u'IsFlies', u'IsWalks', u'IsNoLowLevel',
+            u'IsNoBloodSpray', u'IsNoBloodDecal', u'IsNoHead', u'IsNoRightArm',
+            u'IsNoLeftArm', u'IsNoCombatInWater', u'IsNoShadow',
+            u'IsNoCorpseCheck',),
         u'NPC.Class': (),
         u'NPC.Race': (),
-        u'Actors.CombatStyle': ('combatStyle',),
-        u'Creatures.Blood': ('bloodSprayPath', 'bloodDecalPath'),
-        u'Creatures.Type': ('creatureType',),
-        u'Actors.Skeleton': ('modPath', 'modb', 'modt_p',),
+        u'Actors.CombatStyle': (u'combatStyle',),
+        u'Creatures.Blood': (u'bloodSprayPath', u'bloodDecalPath'),
+        u'Creatures.Type': (u'creatureType',),
+        u'Actors.Skeleton': (u'modPath', u'modb', u'modt_p'),
       }
     }
 
@@ -762,7 +763,7 @@ class KFFZPatcher(_SimpleImporter):
 
 class CBash_KFFZPatcher(CBash_ImportPatcher):
     logMsg = u'* ' + _(u'Imported Animations') + u': %d'
-    _read_write_records = ('CREA', 'NPC_')
+    _read_write_records = (b'CREA', b'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_KFFZPatcher, self).__init__(p_name, p_file, p_sources)
@@ -798,26 +799,26 @@ class NPCAIPackagePatcher(ImportPatcher):
         self.target_rec_types = bush.game.actor_types
 
     def _insertPackage(self, id_merged_deleted, fi, index, pkg, recordData):
-        fi_merged = id_merged_deleted[fi]['merged']
+        fi_merged = id_merged_deleted[fi][u'merged']
         if index == 0: fi_merged.insert(0, pkg)# insert as first item
-        elif index == (len(recordData['merged']) - 1):
+        elif index == (len(recordData[u'merged']) - 1):
             fi_merged.append(pkg)  # insert as last item
         else:  # figure out a good spot to insert it based on next or last
             # recognized item (ugly ugly ugly)
             i = index - 1
             while i >= 0:
-                if recordData['merged'][i] in fi_merged:
+                if recordData[u'merged'][i] in fi_merged:
                     slot = fi_merged.index(
-                        recordData['merged'][i]) + 1
+                        recordData[u'merged'][i]) + 1
                     fi_merged.insert(slot, pkg)
                     break
                 i -= 1
             else:
                 i = index + 1
-                while i != len(recordData['merged']):
-                    if recordData['merged'][i] in fi_merged:
+                while i != len(recordData[u'merged']):
+                    if recordData[u'merged'][i] in fi_merged:
                         slot = fi_merged.index(
-                            recordData['merged'][i])
+                            recordData[u'merged'][i])
                         fi_merged.insert(slot, pkg)
                         break
                     i += 1
@@ -873,45 +874,45 @@ class NPCAIPackagePatcher(ImportPatcher):
                             del tempData[fi]
                             continue
                         if fi in mer_del:
-                            if tempData[fi] == mer_del[fi]['merged']:
+                            if tempData[fi] == mer_del[fi][u'merged']:
                                 continue
-                        recordData = {'deleted':[],'merged':tempData[fi]}
+                        recordData = {u'deleted': [], u'merged': tempData[fi]}
                         for pkg in list(record.aiPackages):
                             if pkg not in tempData[fi]:
-                                recordData['deleted'].append(pkg)
+                                recordData[u'deleted'].append(pkg)
                         if fi not in mer_del:
                             mer_del[fi] = recordData
                         else:
-                            for pkg in recordData['deleted']:
-                                if pkg in mer_del[fi]['merged']:
-                                    mer_del[fi]['merged'].remove(pkg)
-                                mer_del[fi]['deleted'].append(pkg)
-                            if mer_del[fi]['merged'] == []:
-                                for pkg in recordData['merged']:
-                                    if pkg in mer_del[fi]['deleted'] and not \
+                            for pkg in recordData[u'deleted']:
+                                if pkg in mer_del[fi][u'merged']:
+                                    mer_del[fi][u'merged'].remove(pkg)
+                                mer_del[fi][u'deleted'].append(pkg)
+                            if mer_del[fi][u'merged'] == []:
+                                for pkg in recordData[u'merged']:
+                                    if pkg in mer_del[fi][u'deleted'] and not \
                                       u'Actors.AIPackagesForceAdd' in bashTags:
                                         continue
-                                    mer_del[fi]['merged'].append(pkg)
+                                    mer_del[fi][u'merged'].append(pkg)
                                 continue
-                            for index, pkg in enumerate(recordData['merged']):
-                                if pkg not in mer_del[fi]['merged']:# so needs
+                            for index, pkg in enumerate(recordData[u'merged']):
+                                if pkg not in mer_del[fi][u'merged']:# so needs
                                     #  to be added... (unless deleted that is)
                                     # find the correct position to add and add.
-                                    if pkg in mer_del[fi]['deleted'] and not \
+                                    if pkg in mer_del[fi][u'deleted'] and not \
                                       u'Actors.AIPackagesForceAdd' in bashTags:
                                         continue  # previously deleted
                                     self._insertPackage(mer_del, fi, index,
                                                         pkg, recordData)
                                     continue # Done with this package
-                                elif index == mer_del[fi]['merged'].index(
+                                elif index == mer_del[fi][u'merged'].index(
                                         pkg) or (
-                                    len(recordData['merged']) - index) == (
-                                    len(mer_del[fi]['merged']) - mer_del[fi][
+                                    len(recordData[u'merged']) - index) == (
+                                    len(mer_del[fi][u'merged']) - mer_del[fi][
                                     'merged'].index(pkg)):
                                     continue  # pkg same in both lists.
                                 else:  # this import is later loading so we'll
                                     #  assume it is better order
-                                    mer_del[fi]['merged'].remove(pkg)
+                                    mer_del[fi][u'merged'].remove(pkg)
                                     self._insertPackage(mer_del, fi, index,
                                                         pkg, recordData)
             progress.plus()
@@ -933,7 +934,7 @@ class NPCAIPackagePatcher(ImportPatcher):
             for record in getattr(modFile,rec_type).getActiveRecords():
                 fid = mapper(record.fid)
                 if fid not in merged_deleted: continue
-                if list(record.aiPackages) != merged_deleted[fid]['merged']:
+                if list(record.aiPackages) != merged_deleted[fid][u'merged']:
                     patchBlock.setRecord(record.getTypeCopy(mapper))
 
     def buildPatch(self,log,progress): # buildPatch1:no modFileTops, for type..
@@ -947,8 +948,8 @@ class NPCAIPackagePatcher(ImportPatcher):
                 fid = record.fid
                 if fid not in merged_deleted: continue
                 changed = False
-                if record.aiPackages != merged_deleted[fid]['merged']:
-                    record.aiPackages = merged_deleted[fid]['merged']
+                if record.aiPackages != merged_deleted[fid][u'merged']:
+                    record.aiPackages = merged_deleted[fid][u'merged']
                     changed = True
                 if changed:
                     keep(record.fid)
@@ -961,7 +962,7 @@ class NPCAIPackagePatcher(ImportPatcher):
 class CBash_NPCAIPackagePatcher(CBash_ImportPatcher):
     scanRequiresChecked = False
     logMsg = u'* ' + _(u'AI Package Lists Changed') + u': %d'
-    _read_write_records = ('CREA', 'NPC_')
+    _read_write_records = (b'CREA', b'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_NPCAIPackagePatcher, self).__init__(p_name, p_file,
@@ -1041,7 +1042,7 @@ class DeathItemPatcher(_SimpleImporter):
 
 class CBash_DeathItemPatcher(CBash_ImportPatcher):
     logMsg = u'* ' + _(u'Imported Death Items') + u': %d'
-    _read_write_records = ('CREA', 'NPC_')
+    _read_write_records = (b'CREA', b'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_DeathItemPatcher, self).__init__(p_name, p_file, p_sources)
@@ -1049,10 +1050,10 @@ class CBash_DeathItemPatcher(CBash_ImportPatcher):
 
     def scan(self,modFile,record,bashTags):
         """Records information needed to apply the patch."""
-        deathitem = record.ConflictDetails(('deathItem',))
+        deathitem = record.ConflictDetails((u'deathItem',))
         if deathitem:
-            if deathitem['deathItem'].ValidateFormID(self.patchFile):
-                self.id_deathItem[record.fid] = deathitem['deathItem']
+            if deathitem[u'deathItem'].ValidateFormID(self.patchFile):
+                self.id_deathItem[record.fid] = deathitem[u'deathItem']
             else:
                 # Ignore the record. Another option would be to just ignore
                 # the invalid formIDs
@@ -1085,7 +1086,7 @@ class ImportFactions(_SimpleImporter):
 class CBash_ImportFactions(_RecTypeModLogging):
     listSrcs = False
     logModRecs = u'* ' + _(u'Refactioned %(type)s Records: %(count)d')
-    _read_write_records = ('CREA', 'NPC_')
+    _read_write_records = (b'CREA', b'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_ImportFactions, self).__init__(p_name, p_file, p_sources)
@@ -1100,14 +1101,14 @@ class CBash_ImportFactions(_RecTypeModLogging):
         csvId_factions = self.csvId_factions
         for group, aFid_factions in \
                 actorFactions.group_fid_factions.iteritems():
-            if group not in ('CREA','NPC_'): continue
+            if group not in (b'CREA',b'NPC_'): continue
             for fid,factions in aFid_factions.iteritems():
                 csvId_factions[fid] = factions
 
     def scan(self,modFile,record,bashTags):
         """Records information needed to apply the patch."""
         if modFile.GName == record.fid[0]: return
-        factions = record.ConflictDetails(('factions_list',))
+        factions = record.ConflictDetails((u'factions_list',))
         if factions:
             masterRecord = self.patchFile.Current.LookupRecords(record.fid)[-1]
             masterFactions = masterRecord.factions_list
@@ -1115,7 +1116,7 @@ class CBash_ImportFactions(_RecTypeModLogging):
             # Initialize the factions list with what's in the master record
             self.id_factions.setdefault(record.fid, masterDict)
             # Only add/remove records if different than the master record
-            thisFactions = factions['factions_list']
+            thisFactions = factions[u'factions_list']
             masterFids = set([x[0] for x in masterFactions])
             thisFids = set([x[0] for x in thisFactions])
             removedFids = masterFids - thisFids
@@ -1196,17 +1197,17 @@ class ImportRelations(_SimpleImporter):
 
     def getReadClasses(self):
         """Returns load factory classes needed for reading."""
-        return ('FACT',) if self.isActive else ()
+        return (b'FACT',) if self.isActive else ()
 
     def getWriteClasses(self):
         """Returns load factory classes needed for writing."""
-        return ('FACT',) if self.isActive else ()
+        return (b'FACT',) if self.isActive else ()
 
     def scanModFile(self, modFile, progress): # scanModFile2
         """Scan modFile."""
         id_relations= self.id_data
         mapper = modFile.getLongMapper()
-        for type in ('FACT',):
+        for type in (b'FACT',):
             if type not in modFile.tops: continue
             patchBlock = getattr(self.patchFile,type)
             id_records = patchBlock.id_records
@@ -1269,14 +1270,14 @@ class ImportRelations(_SimpleImporter):
                     keep(fid)
 
     def buildPatch(self, log, progress, types=None):
-        super(ImportRelations, self).buildPatch(log, progress, ('FACT',))
+        super(ImportRelations, self).buildPatch(log, progress, (b'FACT',))
 
     def _plog(self,log,type_count):
-        log(self.__class__.logMsg % type_count['FACT'])
+        log(self.__class__.logMsg % type_count[b'FACT'])
 
 class CBash_ImportRelations(CBash_ImportPatcher):
     logMsg = u'* ' + _(u'Re-Relationed Records') + u': %d'
-    _read_write_records = ('FACT',)
+    _read_write_records = (b'FACT',)
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_ImportRelations, self).__init__(p_name, p_file, p_sources)
@@ -1292,10 +1293,10 @@ class CBash_ImportRelations(CBash_ImportPatcher):
 
     def scan(self,modFile,record,bashTags):
         """Records information needed to apply the patch."""
-        relations = record.ConflictDetails(('relations_list',))
+        relations = record.ConflictDetails((u'relations_list',))
         if relations:
             self.fid_faction_mod.setdefault(record.fid, {}).update(
-                relations['relations_list'])
+                relations[u'relations_list'])
 
     def apply(self,modFile,record,bashTags):
         """Edits patch file as desired."""
@@ -1333,9 +1334,9 @@ class ImportScripts(_SimpleImporter):
     rec_attrs = {x: ('script',) for x in bush.game.scripts_types}
 
 class CBash_ImportScripts(_RecTypeModLogging):
-    _read_write_records = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT',
-        'CONT', 'CREA', 'DOOR', 'FLOR', 'FURN', 'INGR', 'KEYM', 'LIGH', 'LVLC',
-        'MISC', 'NPC_', 'QUST', 'SGST', 'SLGM', 'WEAP')
+    _read_write_records = (b'ACTI', b'ALCH', b'APPA', b'ARMO', b'BOOK',
+        b'CLOT', b'CONT', b'CREA', b'DOOR', b'FLOR', b'FURN', b'INGR', b'KEYM',
+        b'LIGH', b'LVLC', b'MISC', b'NPC_', b'QUST', b'SGST', b'SLGM', b'WEAP')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_ImportScripts, self).__init__(p_name, p_file, p_sources)
@@ -1343,9 +1344,9 @@ class CBash_ImportScripts(_RecTypeModLogging):
 
     def scan(self,modFile,record,bashTags):
         """Records information needed to apply the patch."""
-        script = record.ConflictDetails(('script',))
+        script = record.ConflictDetails((u'script',))
         if script:
-            script = script['script']
+            script = script[u'script']
             if script.ValidateFormID(self.patchFile):
                 # Only save if different from the master record
                 if record.GetParentMod().GName != record.fid[0]:
@@ -1556,7 +1557,7 @@ class ImportInventory(_AImportInventory, ImportPatcher):
     def _plog(self, log, mod_count): self._plog1(log, mod_count)
 
 class CBash_ImportInventory(_AImportInventory, _RecTypeModLogging):
-    _read_write_records = ('CREA', 'NPC_', 'CONT')
+    _read_write_records = (b'CREA', b'NPC_', b'CONT')
     listSrcs=False
     logModRecs = u'%(type)s ' + _(u'Inventories Changed') + u': %(count)d'
     allowUnloaded = False # FIXME CORRECT? comments seem to say so
@@ -1684,69 +1685,69 @@ class ImportActorsSpells(ImportPatcher):
                             del tempData[fid]
                             continue
                         if fid in mer_del:
-                            if tempData[fid] == mer_del[fid]['merged']: continue
-                        recordData = {'deleted':[],'merged':tempData[fid]}
+                            if tempData[fid] == mer_del[fid][u'merged']: continue
+                        recordData = {u'deleted':[],u'merged':tempData[fid]}
                         for spell in list(record.spells):
                             if spell not in tempData[fid]:
-                                recordData['deleted'].append(spell)
+                                recordData[u'deleted'].append(spell)
                         if fid not in mer_del:
                             mer_del[fid] = recordData
                         else:
-                            for spell in recordData['deleted']:
-                                if spell in mer_del[fid]['merged']:
-                                    mer_del[fid]['merged'].remove(spell)
-                                mer_del[fid]['deleted'].append(spell)
-                            if mer_del[fid]['merged'] == []:
-                                for spell in recordData['merged']:
-                                    if spell in mer_del[fid]['deleted'] and not u'Actors.SpellsForceAdd' in bashTags: continue
-                                    mer_del[fid]['merged'].append(spell)
+                            for spell in recordData[u'deleted']:
+                                if spell in mer_del[fid][u'merged']:
+                                    mer_del[fid][u'merged'].remove(spell)
+                                mer_del[fid][u'deleted'].append(spell)
+                            if mer_del[fid][u'merged'] == []:
+                                for spell in recordData[u'merged']:
+                                    if spell in mer_del[fid][u'deleted'] and not u'Actors.SpellsForceAdd' in bashTags: continue
+                                    mer_del[fid][u'merged'].append(spell)
                                 continue
-                            for index, spell in enumerate(recordData['merged']):
-                                if spell not in mer_del[fid]['merged']: # so needs to be added... (unless deleted that is)
+                            for index, spell in enumerate(recordData[u'merged']):
+                                if spell not in mer_del[fid][u'merged']: # so needs to be added... (unless deleted that is)
                                     # find the correct position to add and add.
-                                    if spell in mer_del[fid]['deleted'] and not u'Actors.SpellsForceAdd' in bashTags: continue #previously deleted
+                                    if spell in mer_del[fid][u'deleted'] and not u'Actors.SpellsForceAdd' in bashTags: continue #previously deleted
                                     if index == 0:
-                                        mer_del[fid]['merged'].insert(0, spell) #insert as first item
-                                    elif index == (len(recordData['merged'])-1):
-                                        mer_del[fid]['merged'].append(spell) #insert as last item
+                                        mer_del[fid][u'merged'].insert(0, spell) #insert as first item
+                                    elif index == (len(recordData[u'merged'])-1):
+                                        mer_del[fid][u'merged'].append(spell) #insert as last item
                                     else: #figure out a good spot to insert it based on next or last recognized item (ugly ugly ugly)
                                         i = index - 1
                                         while i >= 0:
-                                            if recordData['merged'][i] in mer_del[fid]['merged']:
-                                                slot = mer_del[fid]['merged'].index(recordData['merged'][i]) + 1
-                                                mer_del[fid]['merged'].insert(slot, spell)
+                                            if recordData[u'merged'][i] in mer_del[fid][u'merged']:
+                                                slot = mer_del[fid][u'merged'].index(recordData[u'merged'][i]) + 1
+                                                mer_del[fid][u'merged'].insert(slot, spell)
                                                 break
                                             i -= 1
                                         else:
                                             i = index + 1
-                                            while i != len(recordData['merged']):
-                                                if recordData['merged'][i] in mer_del[fid]['merged']:
-                                                    slot = mer_del[fid]['merged'].index(recordData['merged'][i])
-                                                    mer_del[fid]['merged'].insert(slot, spell)
+                                            while i != len(recordData[u'merged']):
+                                                if recordData[u'merged'][i] in mer_del[fid][u'merged']:
+                                                    slot = mer_del[fid][u'merged'].index(recordData[u'merged'][i])
+                                                    mer_del[fid][u'merged'].insert(slot, spell)
                                                     break
                                                 i += 1
                                     continue # Done with this package
-                                elif index == mer_del[fid]['merged'].index(spell) or (len(recordData['merged'])-index) == (len(mer_del[fid]['merged'])-mer_del[fid]['merged'].index(spell)): continue #spell same in both lists.
+                                elif index == mer_del[fid][u'merged'].index(spell) or (len(recordData[u'merged'])-index) == (len(mer_del[fid][u'merged'])-mer_del[fid][u'merged'].index(spell)): continue #spell same in both lists.
                                 else: #this import is later loading so we'll assume it is better order
-                                    mer_del[fid]['merged'].remove(spell)
+                                    mer_del[fid][u'merged'].remove(spell)
                                     if index == 0:
-                                        mer_del[fid]['merged'].insert(0, spell) #insert as first item
-                                    elif index == (len(recordData['merged'])-1):
-                                        mer_del[fid]['merged'].append(spell) #insert as last item
+                                        mer_del[fid][u'merged'].insert(0, spell) #insert as first item
+                                    elif index == (len(recordData[u'merged'])-1):
+                                        mer_del[fid][u'merged'].append(spell) #insert as last item
                                     else:
                                         i = index - 1
                                         while i >= 0:
-                                            if recordData['merged'][i] in mer_del[fid]['merged']:
-                                                slot = mer_del[fid]['merged'].index(recordData['merged'][i]) + 1
-                                                mer_del[fid]['merged'].insert(slot, spell)
+                                            if recordData[u'merged'][i] in mer_del[fid][u'merged']:
+                                                slot = mer_del[fid][u'merged'].index(recordData[u'merged'][i]) + 1
+                                                mer_del[fid][u'merged'].insert(slot, spell)
                                                 break
                                             i -= 1
                                         else:
                                             i = index + 1
-                                            while i != len(recordData['merged']):
-                                                if recordData['merged'][i] in mer_del[fid]['merged']:
-                                                    slot = mer_del[fid]['merged'].index(recordData['merged'][i])
-                                                    mer_del[fid]['merged'].insert(slot, spell)
+                                            while i != len(recordData[u'merged']):
+                                                if recordData[u'merged'][i] in mer_del[fid][u'merged']:
+                                                    slot = mer_del[fid][u'merged'].index(recordData[u'merged'][i])
+                                                    mer_del[fid][u'merged'].insert(slot, spell)
                                                     break
                                                 i += 1
             progress.plus()
@@ -1760,7 +1761,7 @@ class ImportActorsSpells(ImportPatcher):
             for record in getattr(modFile,type).getActiveRecords():
                 fid = mapper(record.fid)
                 if fid in merged_deleted:
-                    if list(record.spells) != merged_deleted[fid]['merged']:
+                    if list(record.spells) != merged_deleted[fid][u'merged']:
                         patchBlock.setRecord(record.getTypeCopy(mapper))
 
     def buildPatch(self,log,progress): # buildPatch1:no modFileTops, for type..
@@ -1774,7 +1775,7 @@ class ImportActorsSpells(ImportPatcher):
                 fid = record.fid
                 if fid not in merged_deleted: continue
                 changed = False
-                mergedSpells = sorted(merged_deleted[fid]['merged'])
+                mergedSpells = sorted(merged_deleted[fid][u'merged'])
                 if sorted(list(record.spells)) != mergedSpells:
                     record.spells = mergedSpells
                     changed = True
@@ -1788,7 +1789,7 @@ class ImportActorsSpells(ImportPatcher):
 
 class CBash_ImportActorsSpells(CBash_ImportPatcher):
     logMsg = u'* '+_(u'Imported Spell Lists') + u': %d'
-    _read_write_records = ('CREA', 'NPC_')
+    _read_write_records = (b'CREA', b'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_ImportActorsSpells, self).__init__(p_name, p_file,
@@ -1797,7 +1798,7 @@ class CBash_ImportActorsSpells(CBash_ImportPatcher):
 
     def scan(self,modFile,record,bashTags):
         """Records information needed to apply the patch."""
-        curData = {'deleted':[],'merged':[]}
+        curData = {u'deleted':[],u'merged':[]}
         curspells = FormID.FilterValid(record.spells, self.patchFile)
         parentRecords = record.History()
         if parentRecords:
@@ -1807,22 +1808,22 @@ class CBash_ImportActorsSpells(CBash_ImportPatcher):
                     bashTags:
                 for spell in parentSpells:
                     if spell not in curspells:
-                        curData['deleted'].append(spell)
-            curData['merged'] = curspells
+                        curData[u'deleted'].append(spell)
+            curData[u'merged'] = curspells
             if record.fid not in self.id_spells:
                 self.id_spells[record.fid] = curData
             else:
                 id_spells = self.id_spells[record.fid]
-                for spell in curData['deleted']:
-                    if spell in id_spells['merged']:
-                        id_spells['merged'].remove(spell)
-                    id_spells['deleted'].append(spell)
-                for spell in curData['merged']:
-                    if spell in id_spells['merged']: continue  # don't want
+                for spell in curData[u'deleted']:
+                    if spell in id_spells[u'merged']:
+                        id_spells[u'merged'].remove(spell)
+                    id_spells[u'deleted'].append(spell)
+                for spell in curData[u'merged']:
+                    if spell in id_spells[u'merged']: continue  # don't want
                     # to add 20 copies of the spell afterall
                     if spell not in id_spells[
-                        'deleted'] or u'Actors.SpellsForceAdd' in bashTags:
-                        id_spells['merged'].append(spell)
+                        u'deleted'] or u'Actors.SpellsForceAdd' in bashTags:
+                        id_spells[u'merged'].append(spell)
 
     def apply(self,modFile,record,bashTags):
         """Edits patch file as desired."""
@@ -1830,10 +1831,10 @@ class CBash_ImportActorsSpells(CBash_ImportPatcher):
         recordId = record.fid
         mergedSpells = self.id_spells.get(recordId,None)
         if mergedSpells:
-            if sorted(record.spells) != sorted(mergedSpells['merged']):
+            if sorted(record.spells) != sorted(mergedSpells[u'merged']):
                 override = record.CopyAsOverride(self.patchFile)
                 if override:
-                    override.spells = mergedSpells['merged']
+                    override.spells = mergedSpells[u'merged']
                     self.mod_count[modFile.GName] += 1
                     record.UnloadRecord()
                     record._RecordID = override._RecordID
@@ -1889,13 +1890,13 @@ class NamesPatcher(_ANamesPatcher, ImportPatcher):
         for active_type in self.activeTypes:
             if active_type not in modFile.tops: continue
             patchBlock = getattr(self.patchFile, active_type)
-            if active_type == 'CELL':
+            if active_type == b'CELL':
                 id_records = patchBlock.id_cellBlock
                 activeRecords = (cellBlock.cell for cellBlock in
                                  modFile.CELL.cellBlocks if
                                  not cellBlock.cell.flags1.ignored)
                 setter = patchBlock.setCell
-            elif active_type == 'WRLD':
+            elif active_type == b'WRLD':
                 id_records = patchBlock.id_worldBlocks
                 activeRecords = (worldBlock.world for worldBlock in
                                  modFile.WRLD.worldBlocks if
@@ -1922,10 +1923,10 @@ class NamesPatcher(_ANamesPatcher, ImportPatcher):
         type_count = Counter()
         for act_type in self.activeTypes:
             if act_type not in modFile.tops: continue
-            if act_type == 'CELL':
+            if act_type == b'CELL':
                 records = (cellBlock.cell for cellBlock in
                            modFile.CELL.cellBlocks)
-            elif act_type == 'WRLD':
+            elif act_type == b'WRLD':
                 records = (worldBlock.world for worldBlock in
                            modFile.WRLD.worldBlocks)
             else:
@@ -1941,10 +1942,11 @@ class NamesPatcher(_ANamesPatcher, ImportPatcher):
 
 class CBash_NamesPatcher(_ANamesPatcher, _RecTypeModLogging):
     _read_write_records = (
-        'CLAS', 'FACT', 'HAIR', 'EYES', 'RACE', 'MGEF', 'ENCH', 'SPEL', 'BSGN',
-        'ACTI', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'CONT', 'DOOR', 'INGR', 'LIGH',
-        'MISC', 'FLOR', 'FURN', 'WEAP', 'AMMO', 'NPC_', 'CREA', 'SLGM', 'KEYM',
-        'ALCH', 'SGST', 'WRLD', 'CELLS', 'DIAL', 'QUST')
+        b'CLAS', b'FACT', b'HAIR', b'EYES', b'RACE', b'MGEF', b'ENCH', b'SPEL',
+        b'BSGN', b'ACTI', b'APPA', b'ARMO', b'BOOK', b'CLOT', b'CONT', b'DOOR',
+        b'INGR', b'LIGH', b'MISC', b'FLOR', b'FURN', b'WEAP', b'AMMO', b'NPC_',
+        b'CREA', b'SLGM', b'KEYM', b'ALCH', b'SGST', b'WRLD', b'CELLS',
+        b'DIAL', b'QUST')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_NamesPatcher, self).__init__(p_name, p_file, p_sources)
@@ -1965,9 +1967,9 @@ class CBash_NamesPatcher(_ANamesPatcher, _RecTypeModLogging):
 
     def scan(self,modFile,record,bashTags):
         """Records information needed to apply the patch."""
-        full = record.ConflictDetails(('full',))
+        full = record.ConflictDetails((u'full',))
         if full:
-            self.id_full[record.fid] = full['full']
+            self.id_full[record.fid] = full[u'full']
 
     def apply(self,modFile,record,bashTags):
         """Edits patch file as desired."""
@@ -2004,7 +2006,7 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
         """Get faces from TNR files."""
         if not self.isActive: return
         faceData = self.faceData
-        loadFactory = LoadFactory(False,MreRecord.type_class['NPC_'])
+        loadFactory = LoadFactory(False,MreRecord.type_class[b'NPC_'])
         progress.setFull(len(self.srcs))
         cachedMasters = {}
         minfs = self.patchFile.p_file_minfos
@@ -2015,7 +2017,7 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
             faceFile = ModFile(faceInfo,loadFactory)
             bashTags = faceInfo.getBashTags()
             faceFile.load(do_unpack=True)
-            faceFile.convertToLongFids(('NPC_',))
+            faceFile.convertToLongFids((b'NPC_',))
             for npc in faceFile.NPC_.getActiveRecords():
                 if npc.fid[0] in self.patchFile.loadSet:
                     attrs, fidattrs = [],[]
@@ -2059,9 +2061,9 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
                         masterInfo = minfs[master]
                         masterFile = ModFile(masterInfo,loadFactory)
                         masterFile.load(True)
-                        masterFile.convertToLongFids(('NPC_',))
+                        masterFile.convertToLongFids((b'NPC_',))
                         cachedMasters[master] = masterFile
-                    if 'NPC_' not in masterFile.tops: continue
+                    if b'NPC_' not in masterFile.tops: continue
                     for npc in masterFile.NPC_.getActiveRecords():
                         if npc.fid not in temp_faceData: continue
                         for attr, value in temp_faceData[npc.fid].iteritems():
@@ -2078,10 +2080,10 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
     def scanModFile(self, modFile, progress): # scanModFile3: mapper unused !
         """Add lists from modFile."""
         modName = modFile.fileInfo.name
-        if not self.isActive or modName in self.srcs or 'NPC_' not in modFile.tops:
+        if not self.isActive or modName in self.srcs or b'NPC_' not in modFile.tops:
             return
         faceData,patchNpcs = self.faceData,self.patchFile.NPC_
-        modFile.convertToLongFids(('NPC_',))
+        modFile.convertToLongFids((b'NPC_',))
         for npc in modFile.NPC_.getActiveRecords():
             if npc.fid in faceData:
                 patchNpcs.setRecord(npc)
@@ -2114,8 +2116,8 @@ class CBash_NpcFacePatcher(_ANpcFacePatcher,CBash_ImportPatcher):
         super(CBash_NpcFacePatcher, self).__init__(p_name, p_file, p_sources)
         self.id_face = {}
         self.faceData = (
-            'fggs_p', 'fgga_p', 'fgts_p', 'eye', 'hair', 'hairLength',
-            'hairRed', 'hairBlue', 'hairGreen')
+            u'fggs_p', u'fgga_p', u'fgts_p', u'eye', u'hair', u'hairLength',
+            u'hairRed', u'hairBlue', u'hairGreen')
 
     def scan(self,modFile,record,bashTags):
         """Records information needed to apply the patch."""
@@ -2185,20 +2187,20 @@ class SoundPatcher(_SimpleImporter):
 class CBash_SoundPatcher(_RecTypeModLogging):
     """Imports sounds from source mods into patch."""
     _read_write_records = (
-        'ACTI', 'CONT', 'CREA', 'DOOR', 'LIGH', 'MGEF', 'WTHR')
+        b'ACTI', b'CONT', b'CREA', b'DOOR', b'LIGH', b'MGEF', b'WTHR')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_SoundPatcher, self).__init__(p_name, p_file, p_sources)
         class_attrs = self.class_attrs = {}
-        class_attrs['ACTI'] = ('sound',)
-        class_attrs['CONT'] = ('soundOpen','soundClose')
-        class_attrs['CREA'] = ('footWeight','inheritsSoundsFrom','sounds_list')
-        class_attrs['DOOR'] = ('soundOpen','soundClose','soundLoop')
-        class_attrs['LIGH'] = ('sound',)
-        class_attrs['MGEF'] = (
-            'castingSound', 'boltSound', 'hitSound', 'areaSound')
+        class_attrs[b'ACTI'] = (u'sound',)
+        class_attrs[b'CONT'] = (u'soundOpen',u'soundClose')
+        class_attrs[b'CREA'] = (u'footWeight',u'inheritsSoundsFrom',u'sounds_list')
+        class_attrs[b'DOOR'] = (u'soundOpen',u'soundClose',u'soundLoop')
+        class_attrs[b'LIGH'] = (u'sound',)
+        class_attrs[b'MGEF'] = (
+            u'castingSound', u'boltSound', u'hitSound', u'areaSound')
         ##        class_attrs['REGN'] = ('sound','sounds_list')
-        class_attrs['WTHR'] = ('sounds_list',)
+        class_attrs[b'WTHR'] = (u'sounds_list',)
 
     def apply(self,modFile,record,bashTags):
         """Edits patch file as desired."""
@@ -2242,7 +2244,7 @@ class StatsPatcher(_AStatsPatcher, ImportPatcher):
         for group,nId_attr_value in itemStats.class_fid_attr_value.iteritems():
             self.activeTypes.append(group)
             for id, attr_value in nId_attr_value.iteritems():
-                del attr_value['eid']
+                del attr_value[u'eid']
             self.fid_attr_value.update(nId_attr_value)
             self.class_attrs[group] = itemStats.class_attrs[group][1:]
         self.isActive = bool(self.activeTypes)
@@ -2370,13 +2372,13 @@ class SpellsPatcher(ImportPatcher, _ASpellsPatcher):
 
     def scanModFile(self, modFile, progress, __attrgetters=_attrgetters): # scanModFile4: ?
         """Add affected items to patchFile."""
-        if not self.isActive or 'SPEL' not in modFile.tops:
+        if not self.isActive or b'SPEL' not in modFile.tops:
             return
         id_stat = self.id_stat
         spell_attrs = self.spell_attrs
         patchBlock = self.patchFile.SPEL
         id_records = patchBlock.id_records
-        modFile.convertToLongFids(('SPEL',))
+        modFile.convertToLongFids((b'SPEL',))
         for record in modFile.SPEL.getActiveRecords():
             fid = record.fid
             if fid in id_records: continue

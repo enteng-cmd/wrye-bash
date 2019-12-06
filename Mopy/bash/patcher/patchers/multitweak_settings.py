@@ -49,13 +49,13 @@ class GlobalsTweak(DynamicNamedTweak, MultiTweakItem):
                         keep(record.fid)
                     break
         log(u'* ' + _(u'%(label)s set to') % {
-            'label': (u'%s ' % self.tweak_name)} + (u': %4.2f' % value))
+            u'label': (u'%s ' % self.tweak_name)} + (u': %4.2f' % value))
 
 class CBash_GlobalsTweak(DynamicNamedTweak, CBash_MultiTweakItem):
     """Sets a global to specified value"""
     scanOrder = 29
     editOrder = 29
-    tweak_read_classes = 'GLOB',
+    tweak_read_classes = b'GLOB',
 
     #--Patch Phase ------------------------------------------------------------
     def apply(self,modFile,record,bashTags):
@@ -76,7 +76,7 @@ class CBash_GlobalsTweak(DynamicNamedTweak, CBash_MultiTweakItem):
         """Will write to log."""
         #--Log
         if self.count: log(u'* ' + _(u'%(label)s set to') % {
-            'label': (u'%s ' % self.tweak_name)} + (u': %4.2f' % self.value))
+            u'label': (u'%s ' % self.tweak_name)} + (u': %4.2f' % self.value))
 
 #------------------------------------------------------------------------------
 class GmstTweak(DynamicNamedTweak, MultiTweakItem):
@@ -99,7 +99,7 @@ class GmstTweak(DynamicNamedTweak, MultiTweakItem):
                         keep(record.fid)
                     break
             else:
-                gmst = MreRecord.type_class['GMST'](RecHeader('GMST'))
+                gmst = MreRecord.type_class[b'GMST'](RecHeader(b'GMST'))
                 gmst.eid,gmst.value,gmst.longFids = eid,value,True
                 gmst_fid = gmst.getGMSTFid()
                 gmst.fid = gmst_fid
@@ -125,7 +125,7 @@ class CBash_GmstTweak(DynamicNamedTweak, CBash_MultiTweakItem):
     """Sets a gmst to specified value"""
     scanOrder = 29
     editOrder = 29
-    tweak_read_classes = 'GMST',
+    tweak_read_classes = b'GMST',
 
     def apply(self,modFile,record,bashTags):
         """Edits patch file as desired. """
@@ -137,7 +137,7 @@ class CBash_GmstTweak(DynamicNamedTweak, CBash_MultiTweakItem):
                 break
         else:
             return
-        if recEid.startswith(u"f") and type(newValue) != float:
+        if recEid.startswith(u'f') and type(newValue) != float:
             deprint(u'converting custom value to float for GMST %s: %s' % (
                 recEid, newValue))
             newValue = float(newValue)
@@ -160,7 +160,7 @@ class CBash_GmstTweak(DynamicNamedTweak, CBash_MultiTweakItem):
         subProgress.setFull(max(len(values),1))
         pstate = 0
         for eid,value in zip(self.key,values):
-            subProgress(pstate, _(u"Finishing GMST Tweaks..."))
+            subProgress(pstate, _(u'Finishing GMST Tweaks...'))
             if not self.eid_count.get(eid,0):
                 self.eid_count[eid] = 1
                 record = patchFile.create_GMST(eid)
@@ -169,8 +169,8 @@ class CBash_GmstTweak(DynamicNamedTweak, CBash_MultiTweakItem):
                     print(patchFile.Current.Debug_DumpModFiles())
                     for conflict in patchFile.Current.LookupRecords(eid,False):
                         print(conflict.GetParentMod().ModName)
-                    raise StateError(u"Tweak Settings: Unable to create GMST!")
-                if eid.startswith("f") and type(value) != float:
+                    raise StateError(u'Tweak Settings: Unable to create GMST!')
+                if eid.startswith(u'f') and type(value) != float:
                     deprint(u'Converting custom value to float for GMST %s: '
                             u'%s' % (eid, value))
                     value = float(value)
@@ -220,7 +220,7 @@ class GmstTweaker(MultiTweaker, _AGmstTweaker):
     editOrder = 29
     _class_tweaks = [(GlobalsTweak, bush.game.GlobalsTweaks),
                     (GmstTweak, bush.game.GmstTweaks)]
-    _read_write_records = ('GMST', 'GLOB')
+    _read_write_records = (b'GMST', b'GLOB')
 
     def scanModFile(self,modFile,progress):
         mapper = modFile.getLongMapper()

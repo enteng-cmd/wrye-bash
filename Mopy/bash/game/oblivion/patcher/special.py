@@ -71,7 +71,7 @@ class _AAlchemicalCatalogs(_ExSpecial):
     patcher_text = u'\n\n'.join(
         [_(u"Update COBL's catalogs of alchemical ingredients and effects."),
          _(u'Will only run if Cobl Main.esm is loaded.')])
-    _read_write_records = ('INGR',)
+    _read_write_records = (b'INGR',)
 
     @classmethod
     def gui_cls_vars(cls):
@@ -378,7 +378,7 @@ class _ACoblExhaustion(_ExSpecialList):
         [_(u"Modify greater powers to use Cobl's Power Exhaustion feature."),
          _(u'Will only run if Cobl Main v1.66 (or higher) is active.')])
     autoKey = {u'Exhaust'}
-    _read_write_records = ('SPEL',)
+    _read_write_records = (b'SPEL',)
 
     def __init__(self, p_name, p_file, p_sources):
         super(_ACoblExhaustion, self).__init__(p_name, p_file, p_sources)
@@ -528,7 +528,7 @@ class _AMFactMarker(_ExSpecialList):
          _(u"Requires Cobl 1.28 and Wrye Morph or similar.")])
     srcsHeader = u'=== ' + _(u'Source Mods/Files')
     autoKey = {u'MFact'}
-    _read_write_records = ('FACT',)
+    _read_write_records = (b'FACT',)
 
     def _pLog(self, log, changed):
         log.setHeader(u'= ' + self._patcher_name)
@@ -722,7 +722,7 @@ class _ASEWorldEnforcer(_ExSpecial):
     patcher_text = _(u"Suspends Cyrodiil quests while in Shivering Isles. "
                      u"I.e. re-instates GetPlayerInSEWorld tests as "
                      u"necessary.")
-    _read_write_records = ('QUST',)
+    _read_write_records = (b'QUST',)
 
     @classmethod
     def gui_cls_vars(cls):
