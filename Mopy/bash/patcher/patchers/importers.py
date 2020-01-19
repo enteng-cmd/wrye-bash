@@ -131,8 +131,7 @@ class _SimpleImporter(ImportPatcher):
                 if master in cachedMasters:
                     masterFile = cachedMasters[master]
                 else:
-                    masterInfo = minfs[master]
-                    masterFile = ModFile(masterInfo,loadFactory)
+                    masterFile = ModFile(minfs[master], loadFactory)
                     masterFile.load(True)
                     masterFile.convertToLongFids(longTypes)
                     cachedMasters[master] = masterFile
@@ -354,8 +353,7 @@ class CellImporter(ImportPatcher):
                 if master in cachedMasters:
                     masterFile = cachedMasters[master]
                 else:
-                    masterInfo = minfs[master]
-                    masterFile = ModFile(masterInfo,loadFactory)
+                    masterFile = ModFile(minfs[master], loadFactory)
                     masterFile.load(True)
                     masterFile.convertToLongFids(('CELL','WRLD'))
                     cachedMasters[master] = masterFile
@@ -504,8 +502,8 @@ class CBash_CellImporter(CBash_ImportPatcher):
         recordId = record.fid
         prev_attr_value = self.fid_attr_value.get(recordId,None)
         if prev_attr_value:
-            cur_attr_value = dict(
-                (attr, getattr(record, attr)) for attr in prev_attr_value)
+            cur_attr_value = {attr: getattr(record, attr) for attr
+                              in prev_attr_value}
             if cur_attr_value != prev_attr_value:
                 override = record.CopyAsOverride(self.patchFile)
                 if override:
@@ -547,8 +545,9 @@ class GraphicsPatcher(_SimpleImporter):
         # Why does Graphics have a seperate entry for Fids when SoundPatcher does not?
         # for recClass in (MreRecord.type_class[x] for x in ('MGEF',)):
         #     recFidAttrs_class[recClass] = bush.game.graphicsMgefFidAttrs
-        self.recFidAttrs_class = {MreRecord.type_class[recType]: attrs for
-                        recType, attrs in bush.game.graphicsFidTypes.iteritems()}
+        self.recFidAttrs_class = {
+            MreRecord.type_class[recType]: attrs for recType, attrs
+            in bush.game.graphicsFidTypes.iteritems()}
 
     def _init_data_loop(self, mapper, recClass, srcFile, srcMod, temp_id_data,
                         __attrgetters=_attrgetters):
@@ -645,8 +644,8 @@ class CBash_GraphicsPatcher(_RecTypeModLogging):
         self.scan_more(modFile,record,bashTags)
         prev_attr_value = self.fid_attr_value.get(record.fid,None)
         if prev_attr_value:
-            cur_attr_value = dict(
-                (attr, getattr(record, attr)) for attr in prev_attr_value)
+            cur_attr_value = {attr: getattr(record, attr) for attr
+                              in prev_attr_value}
             if cur_attr_value != prev_attr_value:
                 override = record.CopyAsOverride(self.patchFile)
                 if override:
@@ -746,7 +745,8 @@ class CBash_ActorImporter(_RecTypeModLogging):
         recordId = record.fid
         prev_attr_value = self.fid_attr_value.get(recordId,None)
         if prev_attr_value:
-            cur_attr_value = dict((attr,getattr(record,attr)) for attr in prev_attr_value)
+            cur_attr_value = {attr: getattr(record, attr) for attr
+                              in prev_attr_value}
             if cur_attr_value != prev_attr_value:
                 override = record.CopyAsOverride(self.patchFile)
                 if override:
@@ -852,8 +852,7 @@ class NPCAIPackagePatcher(ImportPatcher):
                 if master in cachedMasters:
                     masterFile = cachedMasters[master]
                 else:
-                    masterInfo = minfs[master]
-                    masterFile = ModFile(masterInfo,loadFactory)
+                    masterFile = ModFile(minfs[master], loadFactory)
                     masterFile.load(True)
                     masterFile.convertToLongFids(target_rec_types)
                     cachedMasters[master] = masterFile
@@ -1111,18 +1110,18 @@ class CBash_ImportFactions(_RecTypeModLogging):
         if factions:
             masterRecord = self.patchFile.Current.LookupRecords(record.fid)[-1]
             masterFactions = masterRecord.factions_list
-            masterDict = dict((x[0],x[1]) for x in masterFactions)
+            masterDict = {x[0]: x[1] for x in masterFactions}
             # Initialize the factions list with what's in the master record
             self.id_factions.setdefault(record.fid, masterDict)
             # Only add/remove records if different than the master record
             thisFactions = factions['factions_list']
-            masterFids = set([x[0] for x in masterFactions])
-            thisFids = set([x[0] for x in thisFactions])
+            masterFids = {x[0] for x in masterFactions}
+            thisFids = {x[0] for x in thisFactions}
             removedFids = masterFids - thisFids
             addedFids = thisFids - masterFids
             # Add new factions
             self.id_factions[record.fid].update(
-                dict((x[0], x[1]) for x in thisFactions if x[0] in addedFids))
+                {x[0]: x[1] for x in thisFactions if x[0] in addedFids})
             # Remove deleted factions
             for fid in removedFids:
                 self.id_factions[record.fid].pop(fid,None)
@@ -1132,18 +1131,18 @@ class CBash_ImportFactions(_RecTypeModLogging):
         self.scan_more(modFile,record,bashTags)
         fid = record.fid
         if fid in self.csvId_factions:
-            newFactions = set(
-                [(faction, rank) for faction, rank in self.csvId_factions[fid]
-                 if faction.ValidateFormID(self.patchFile)])
+            newFactions = {(faction, rank) for faction, rank
+                           in self.csvId_factions[fid]
+                           if faction.ValidateFormID(self.patchFile)}
         elif fid in self.id_factions:
-            newFactions = set([(faction, rank) for faction, rank in
-                               self.id_factions[fid].iteritems() if
-                               faction.ValidateFormID(self.patchFile)])
+            newFactions = {(faction, rank) for faction, rank
+                           in self.id_factions[fid].iteritems()
+                           if faction.ValidateFormID(self.patchFile)}
         else:
             return
-        curFactions = set(
-            [(faction[0], faction[1]) for faction in record.factions_list if
-             faction[0].ValidateFormID(self.patchFile)])
+        curFactions = {(faction[0], faction[1]) for faction
+                       in record.factions_list
+                       if faction[0].ValidateFormID(self.patchFile)}
         changed = newFactions - curFactions
         removed = curFactions - newFactions
         if changed or removed:
@@ -1302,13 +1301,13 @@ class CBash_ImportRelations(CBash_ImportPatcher):
         self.scan_more(modFile,record,bashTags)
         fid = record.fid
         if fid in self.csvFid_faction_mod:
-            newRelations = set((faction, mod) for faction, mod in
-                               self.csvFid_faction_mod[fid].iteritems() if
-                               faction.ValidateFormID(self.patchFile))
+            newRelations = {(faction, mod) for faction, mod
+                            in self.csvFid_faction_mod[fid].iteritems()
+                            if faction.ValidateFormID(self.patchFile)}
         elif fid in self.fid_faction_mod:
-            newRelations = set((faction, mod) for faction, mod in
-                               self.fid_faction_mod[fid].iteritems() if
-                               faction.ValidateFormID(self.patchFile))
+            newRelations = {(faction, mod) for faction, mod
+                            in self.fid_faction_mod[fid].iteritems()
+                            if faction.ValidateFormID(self.patchFile)}
         else:
             return
         curRelations = set(record.relations_list)
@@ -1567,8 +1566,8 @@ class CBash_ImportInventory(_AImportInventory, _RecTypeModLogging):
         masters_ = record.History()
         if not masters_: return
         entries = record.items_list
-        modItems = set((item, count) for item, count in entries if
-                       item.ValidateFormID(self.patchFile))
+        modItems = {(item, count) for item, count in entries if
+                    item.ValidateFormID(self.patchFile)}
         masterEntries = []
         id_deltas = self.id_deltas
         fid = record.fid
@@ -1602,8 +1601,7 @@ class CBash_ImportInventory(_AImportInventory, _RecTypeModLogging):
                 #Otherwise, use the previous one.
                 else:
                     record = conflicts[1]
-
-        removable = set(entry.item for entry in record.items)
+        removable = {entry.item for entry in record.items}
         items = record.items_list
         for removeItems,addEntries in reversed(deltas):
             if removeItems:
@@ -1613,14 +1611,13 @@ class CBash_ImportInventory(_AImportInventory, _RecTypeModLogging):
                          item not in removeItems]
                 removable -= removeItems
             if addEntries:
-                current = set(item for item,count in items)
+                current = {item for item, count in items}
                 for item,count in addEntries:
                     if item not in current:
                         items.append((item,count))
-
-        if len(items) != len(record.items_list) or set(
-                (item, count) for item, count in record.items_list) != set(
-                (item, count) for item, count in items):
+        if len(items) != len(record.items_list) or {
+            (item, count) for item, count in record.items_list} != {
+            (item, count) for item, count in items}:
             override = record.CopyAsOverride(self.patchFile)
             if override:
                 override.items_list = items
@@ -1667,8 +1664,7 @@ class ImportActorsSpells(ImportPatcher):
                 if master in cachedMasters:
                     masterFile = cachedMasters[master]
                 else:
-                    masterInfo = minfs[master]
-                    masterFile = ModFile(masterInfo,loadFactory)
+                    masterFile = ModFile(minfs[master], loadFactory)
                     masterFile.load(True)
                     masterFile.convertToLongFids(target_rec_types)
                     cachedMasters[master] = masterFile
@@ -2024,28 +2020,19 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
                         attrs = ['hairLength','hairRed','hairBlue','hairGreen']
                     if u'Npc.EyesOnly' in bashTags:
                         fidattrs += ['eye']
-                    if fidattrs:
-                        attr_fidvalue = dict(
-                            (attr, npc.__getattribute__(attr)) for attr in
-                            fidattrs)
-                    else:
-                        attr_fidvalue = dict(
-                            (attr, npc.__getattribute__(attr)) for attr in
-                            ('eye', 'hair'))
+                    if not fidattrs: # if neither tag is set, default to this
+                        fidattrs = ['eye', 'hair']
+                        attrs = ['fggs_p', 'fgga_p', 'fgts_p', 'hairLength',
+                                 'hairRed', 'hairBlue', 'hairGreen']
+                    attr_fidvalue = {attr: npc.__getattribute__(attr)
+                                     for attr in fidattrs}
                     for fidvalue in attr_fidvalue.values():
                         if fidvalue and (fidvalue[0] is None or fidvalue[0] not in self.patchFile.loadSet):
                             self._ignore_record(faceMod)
                             break
                     else:
-                        if not fidattrs:
-                            temp_faceData[npc.fid] = dict(
-                                (attr, npc.__getattribute__(attr)) for attr in
-                                ('fggs_p', 'fgga_p', 'fgts_p', 'hairLength',
-                                 'hairRed', 'hairBlue', 'hairGreen'))
-                        else:
-                            temp_faceData[npc.fid] = dict(
-                                (attr, npc.__getattribute__(attr)) for attr in
-                                attrs)
+                        temp_faceData[npc.fid] = {
+                            attr: npc.__getattribute__(attr) for attr in attrs}
                         temp_faceData[npc.fid].update(attr_fidvalue)
             if u'NpcFacesForceFullImport' in bashTags:
                 for fid in temp_faceData:
@@ -2056,8 +2043,7 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
                     if master in cachedMasters:
                         masterFile = cachedMasters[master]
                     else:
-                        masterInfo = minfs[master]
-                        masterFile = ModFile(masterInfo,loadFactory)
+                        masterFile = ModFile(minfs[master], loadFactory)
                         masterFile.load(True)
                         masterFile.convertToLongFids(('NPC_',))
                         cachedMasters[master] = masterFile
@@ -2066,11 +2052,10 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
                         if npc.fid not in temp_faceData: continue
                         for attr, value in temp_faceData[npc.fid].iteritems():
                             if value == npc.__getattribute__(attr): continue
-                            if npc.fid not in faceData: faceData[
-                                npc.fid] = dict()
+                            if npc.fid not in faceData: faceData[npc.fid] = {}
                             try:
-                                faceData[npc.fid][attr] = \
-                                temp_faceData[npc.fid][attr]
+                                faceData[npc.fid][attr] = temp_faceData[
+                                    npc.fid][attr]
                             except KeyError:
                                 faceData[npc.fid].setdefault(attr,value)
             progress.plus()
@@ -2121,7 +2106,7 @@ class CBash_NpcFacePatcher(_ANpcFacePatcher,CBash_ImportPatcher):
         """Records information needed to apply the patch."""
         attrs = []
         if u'NpcFacesForceFullImport' in bashTags:
-            face = dict((attr,getattr(record,attr)) for attr in self.faceData)
+            face = {attr: getattr(record, attr) for attr in self.faceData}
             if ValidateDict(face, self.patchFile):
                 self.id_face[record.fid] = face
             else:
@@ -2161,8 +2146,8 @@ class CBash_NpcFacePatcher(_ANpcFacePatcher,CBash_ImportPatcher):
         recordId = record.fid
         prev_face_value = self.id_face.get(recordId,None)
         if prev_face_value:
-            cur_face_value = dict(
-                (attr, getattr(record, attr)) for attr in prev_face_value)
+            cur_face_value = {attr: getattr(record, attr) for attr
+                              in prev_face_value}
             if cur_face_value != prev_face_value:
                 override = record.CopyAsOverride(self.patchFile)
                 if override:
@@ -2206,8 +2191,8 @@ class CBash_SoundPatcher(_RecTypeModLogging):
         recordId = record.fid
         prev_attr_value = self.fid_attr_value.get(recordId,None)
         if prev_attr_value:
-            cur_attr_value = dict(
-                (attr, getattr(record, attr)) for attr in prev_attr_value)
+            cur_attr_value = {attr: getattr(record, attr) for attr
+                              in prev_attr_value}
             if cur_attr_value != prev_attr_value:
                 override = record.CopyAsOverride(self.patchFile)
                 if override:
@@ -2332,7 +2317,8 @@ class CBash_StatsPatcher(_AStatsPatcher, _RecTypeModLogging):
         if csv_attr_value and ValidateDict(csv_attr_value, self.patchFile):
             prev_attr_value = csv_attr_value
         if prev_attr_value:
-            cur_attr_value = dict((attr,getattr(record,attr)) for attr in prev_attr_value)
+            cur_attr_value = {attr: getattr(record, attr) for attr
+                              in prev_attr_value}
             if cur_attr_value != prev_attr_value:
                 override = record.CopyAsOverride(self.patchFile)
                 if override:
@@ -2448,8 +2434,7 @@ class CBash_SpellsPatcher(CBash_ImportPatcher, _ASpellsPatcher):
         if csv_values and ValidateDict(csv_values, self.patchFile):
             prev_values = csv_values
         if prev_values:
-            rec_values = dict(
-                (attr, getattr(record, attr)) for attr in prev_values)
+            rec_values = {attr: getattr(record, attr) for attr in prev_values}
             if rec_values != prev_values:
                 override = record.CopyAsOverride(self.patchFile)
                 if override:
