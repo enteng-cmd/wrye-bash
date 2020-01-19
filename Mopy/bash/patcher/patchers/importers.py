@@ -469,7 +469,7 @@ class CellImporter(ImportPatcher):
             log(u'* %s: %d' % (srcMod.s,count[srcMod]))
 
 class CBash_CellImporter(CBash_ImportPatcher):
-    logMsg = u'* ' + _(u'Cells/Worlds Patched') + u': %d'
+    logMsg = u'* ' + _(u'Cells/Worlds Patched: %d')
     _read_write_records = ('CELLS',)
     tag_attrs = {
         u'C.Climate': ('climate', 'IsBehaveLikeExterior'),
@@ -762,7 +762,7 @@ class KFFZPatcher(_SimpleImporter):
     rec_attrs = {x: ('animations',) for x in bush.game.actor_types}
 
 class CBash_KFFZPatcher(CBash_ImportPatcher):
-    logMsg = u'* ' + _(u'Imported Animations') + u': %d'
+    logMsg = u'* ' + _(u'Imported Animations: %d')
     _read_write_records = ('CREA', 'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
@@ -790,7 +790,7 @@ class CBash_KFFZPatcher(CBash_ImportPatcher):
 
 #------------------------------------------------------------------------------
 class NPCAIPackagePatcher(ImportPatcher):
-    logMsg = u'\n=== ' + _(u'AI Package Lists Changed') + u': %d'
+    logMsg = u'\n=== ' + _(u'AI Package Lists Changed: %d')
 
     def __init__(self, p_name, p_file, p_sources):
         super(NPCAIPackagePatcher, self).__init__(p_name, p_file, p_sources)
@@ -961,7 +961,7 @@ class NPCAIPackagePatcher(ImportPatcher):
 
 class CBash_NPCAIPackagePatcher(CBash_ImportPatcher):
     scanRequiresChecked = False
-    logMsg = u'* ' + _(u'AI Package Lists Changed') + u': %d'
+    logMsg = u'* ' + _(u'AI Package Lists Changed: %d')
     _read_write_records = ('CREA', 'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
@@ -1041,7 +1041,7 @@ class DeathItemPatcher(_SimpleImporter):
     rec_attrs = {x: ('deathItem',) for x in bush.game.actor_types}
 
 class CBash_DeathItemPatcher(CBash_ImportPatcher):
-    logMsg = u'* ' + _(u'Imported Death Items') + u': %d'
+    logMsg = u'* ' + _(u'Imported Death Items: %d')
     _read_write_records = ('CREA', 'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
@@ -1168,7 +1168,7 @@ class CBash_ImportFactions(_RecTypeModLogging):
 
 #------------------------------------------------------------------------------
 class ImportRelations(_SimpleImporter):
-    logMsg = u'\n=== ' + _(u'Modified Factions') + u': %d'
+    logMsg = u'\n=== ' + _(u'Modified Factions: %d')
     srcsHeader = u'=== ' + _(u'Source Mods/Files')
 
     def __init__(self, p_name, p_file, p_sources):
@@ -1276,7 +1276,7 @@ class ImportRelations(_SimpleImporter):
         log(self.__class__.logMsg % type_count['FACT'])
 
 class CBash_ImportRelations(CBash_ImportPatcher):
-    logMsg = u'* ' + _(u'Re-Relationed Records') + u': %d'
+    logMsg = u'* ' + _(u'Re-Relationed Records: %d')
     _read_write_records = ('FACT',)
 
     def __init__(self, p_name, p_file, p_sources):
@@ -1390,7 +1390,7 @@ class _AImportInventory(AListPatcher):  # next class that has ___init__
                                u'IIM' in p_file.p_file_minfos[x].getBashTags()}
 
 class ImportInventory(_AImportInventory, ImportPatcher):
-    logMsg = u'\n=== ' + _(u'Inventories Changed') + u': %d'
+    logMsg = u'\n=== ' + _(u'Inventories Changed: %d')
 
     def __init__(self, p_name, p_file, p_sources):
         p_sources = [x for x in p_sources if
@@ -1559,7 +1559,7 @@ class ImportInventory(_AImportInventory, ImportPatcher):
 class CBash_ImportInventory(_AImportInventory, _RecTypeModLogging):
     _read_write_records = ('CREA', 'NPC_', 'CONT')
     listSrcs=False
-    logModRecs = u'%(type)s ' + _(u'Inventories Changed') + u': %(count)d'
+    logModRecs = u'* ' + _(u'%(type)s Inventories Changed: %(count)d')
     allowUnloaded = False # FIXME CORRECT? comments seem to say so
 
     def scan(self,modFile,record,bashTags):
@@ -1631,7 +1631,7 @@ class CBash_ImportInventory(_AImportInventory, _RecTypeModLogging):
 
 #------------------------------------------------------------------------------
 class ImportActorsSpells(ImportPatcher):
-    logMsg = u'\n=== ' + _(u'Spell Lists Changed') + u': %d'
+    logMsg = u'\n=== ' + _(u'Spell Lists Changed: %d')
 
     def __init__(self, p_name, p_file, p_sources):
         super(ImportActorsSpells, self).__init__(p_name, p_file, p_sources)
@@ -1788,7 +1788,7 @@ class ImportActorsSpells(ImportPatcher):
     def _plog(self, log, mod_count): self._plog1(log, mod_count)
 
 class CBash_ImportActorsSpells(CBash_ImportPatcher):
-    logMsg = u'* '+_(u'Imported Spell Lists') + u': %d'
+    logMsg = u'* ' + _(u'Imported Spell Lists: %d')
     _read_write_records = ('CREA', 'NPC_')
 
     def __init__(self, p_name, p_file, p_sources):
@@ -1995,7 +1995,7 @@ class _ANpcFacePatcher(AImportPatcher):
         self.patchFile.patcher_mod_skipcount[self._patcher_name][faceMod] += 1
 
 class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
-    logMsg = u'\n=== '+_(u'Faces Patched') + u': %d'
+    logMsg = u'\n=== ' + _(u'Faces Patched: %d')
 
     def __init__(self, p_name, p_file, p_sources):
         super(NpcFacePatcher, self).__init__(p_name, p_file, p_sources)
@@ -2109,7 +2109,7 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
     def _plog(self, log, count): log(self.__class__.logMsg % count)
 
 class CBash_NpcFacePatcher(_ANpcFacePatcher,CBash_ImportPatcher):
-    logMsg = u'* '+_(u'Faces Patched') + u': %d'
+    logMsg = u'* ' + _(u'Faces Patched: %d')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_NpcFacePatcher, self).__init__(p_name, p_file, p_sources)
@@ -2413,7 +2413,7 @@ class SpellsPatcher(ImportPatcher, _ASpellsPatcher):
     def _plog(self, log, allCounts): self._plog2(log, allCounts)
 
 class CBash_SpellsPatcher(CBash_ImportPatcher, _ASpellsPatcher):
-    logMsg = u'* ' + _(u'Modified SPEL Stats') + u': %d'
+    logMsg = u'* ' + _(u'Modified SPEL Stats: %d')
 
     def __init__(self, p_name, p_file, p_sources):
         super(CBash_SpellsPatcher, self).__init__(p_name, p_file, p_sources)
