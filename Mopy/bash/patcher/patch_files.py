@@ -217,6 +217,7 @@ class PatchFile(_PFile, ModFile):
                 progress(index,modName.s+u'\n'+_(u'Loading...'))
                 modFile = ModFile(modInfo,loadFactory)
                 modFile.load(True,SubProgress(progress,index,index+0.5))
+                modFile.convertToLongFids()
             except ModError as e:
                 deprint('load error:', traceback=True)
                 self.loadErrorMods.append((modName,e))
@@ -257,7 +258,6 @@ class PatchFile(_PFile, ModFile):
 
     def mergeModFile(self,modFile,progress,doFilter,iiMode):
         """Copies contents of modFile into self."""
-        modFile.convertToLongFids()
         for blockType,block in modFile.tops.iteritems():
             #--Make sure block type is also in read and write factories
             if blockType not in self.loadFactory.recTypes:
@@ -271,16 +271,13 @@ class PatchFile(_PFile, ModFile):
     def update_patch_records_from_mod(self, modFile):
         """Scans file and overwrites own records with modfile records."""
         #--Keep all MGEFs
-        modFile.convertToLongFids(('MGEF',))
-        if 'MGEF' in modFile.tops:
+        if b'MGEF' in modFile.tops:
             for record in modFile.MGEF.getActiveRecords():
                 self.MGEF.setRecord(record.getTypeCopy())
         #--Merger, override.
-        mergeIds = self.mergeIds
-        mapper = modFile.getLongMapper()
-        for blockType,block in self.tops.iteritems():
-            if blockType in modFile.tops:
-                block.updateRecords(modFile.tops[blockType],mapper,mergeIds)
+        for block_type in set(self.tops) & set(modFile.tops):
+            self.tops[block_type].updateRecords(modFile.tops[block_type],
+                                                self.mergeIds)
 
     def buildPatch(self,log,progress):
         """Completes merge process. Use this when finished using

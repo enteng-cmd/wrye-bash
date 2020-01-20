@@ -144,7 +144,6 @@ class _SimpleImporter(ImportPatcher):
                             else:
                                 id_data[fid][attr] = value
             progress.plus()
-        self.longTypes &= {x.rec_sig for x in self.srcClasses}
         self.isActive = bool(self.srcClasses)
 
     def scanModFile(self, modFile, progress, __attrgetters=_attrgetters):
@@ -154,20 +153,15 @@ class _SimpleImporter(ImportPatcher):
             SoundPatcher, DestructiblePatcher, ActorImporter, WeaponModsPatcher
         """
         id_data = self.id_data
-        mapper = modFile.getLongMapper()
-        if self.longTypes:
-            modFile.convertToLongFids(self.longTypes)
         for recClass in self.srcClasses:
             if recClass.rec_sig not in modFile.tops: continue
             patchBlock = getattr(self.patchFile,
                 recClass.rec_sig.decode(u'ascii'))
             for record in modFile.tops[recClass.rec_sig].getActiveRecords():
-                fid = record.fid
-                if not record.longFids: fid = mapper(fid)
-                if fid not in id_data: continue
-                for attr, value in id_data[fid].iteritems():
+                if record.fid not in id_data: continue
+                for attr, value in id_data[record.fid].iteritems():
                     if __attrgetters[attr](record) != value:
-                        patchBlock.setRecord(record.getTypeCopy(mapper))
+                        patchBlock.setRecord(record.getTypeCopy())
                         break
 
     def _inner_loop(self, keep, records, top_mod_rec, type_count,
@@ -376,7 +370,6 @@ class CellImporter(ImportPatcher):
         cellData = self.cellData
         patchCells = self.patchFile.CELL
         patchWorlds = self.patchFile.WRLD
-        modFile.convertToLongFids(('CELL','WRLD'))
         if 'CELL' in modFile.tops:
             for cellBlock in modFile.CELL.cellBlocks:
                 if cellBlock.cell.fid in cellData:
@@ -820,8 +813,8 @@ class NPCAIPackagePatcher(ImportPatcher):
         """Get data from source files."""
         if not self.isActive: return
         target_rec_types = self.target_rec_types
-        loadFactory = LoadFactory(False, *[MreRecord.type_class[x] for x
-                                           in target_rec_types])
+        target_classes = (MreRecord.type_class[x] for x in target_rec_types)
+        loadFactory = LoadFactory(False, *target_classes)
         progress.setFull(len(self.srcs))
         cachedMasters = {}
         mer_del = self.id_merged_deleted
@@ -834,13 +827,11 @@ class NPCAIPackagePatcher(ImportPatcher):
             bashTags = srcInfo.getBashTags()
             srcFile.load(True)
             srcFile.convertToLongFids(target_rec_types)
-            mapper = srcFile.getLongMapper()
             for recClass in (MreRecord.type_class[x] for x in target_rec_types):
                 if recClass.rec_sig not in srcFile.tops: continue
                 for record in srcFile.tops[
                     recClass.rec_sig].getActiveRecords():
-                    fi = mapper(record.fid)
-                    tempData[fi] = list(record.aiPackages)
+                    tempData[record.fid] = list(record.aiPackages)
             for master in reversed(srcInfo.masterNames):
                 if master not in minfs: continue # or break filter mods
                 if master in cachedMasters:
@@ -850,14 +841,13 @@ class NPCAIPackagePatcher(ImportPatcher):
                     masterFile.load(True)
                     masterFile.convertToLongFids(target_rec_types)
                     cachedMasters[master] = masterFile
-                mapper = masterFile.getLongMapper()
                 blocks = (MreRecord.type_class[x] for x in target_rec_types)
                 for block in blocks:
                     if block.rec_sig not in srcFile.tops: continue
                     if block.rec_sig not in masterFile.tops: continue
                     for record in masterFile.tops[
                         block.rec_sig].getActiveRecords():
-                        fi = mapper(record.fid)
+                        fi = record.fid
                         if fi not in tempData: continue
                         if record.aiPackages == tempData[fi] and not \
                             u'Actors.AIPackagesForceAdd' in bashTags:
@@ -869,7 +859,7 @@ class NPCAIPackagePatcher(ImportPatcher):
                             if tempData[fi] == mer_del[fi]['merged']:
                                 continue
                         recordData = {'deleted':[],'merged':tempData[fi]}
-                        for pkg in list(record.aiPackages):
+                        for pkg in record.aiPackages:
                             if pkg not in tempData[fi]:
                                 recordData['deleted'].append(pkg)
                         if fi not in mer_del:
@@ -920,14 +910,13 @@ class NPCAIPackagePatcher(ImportPatcher):
     def scanModFile(self, modFile, progress): # scanModFile2: loop, LongTypes..
         """Add record from modFile."""
         merged_deleted = self.id_merged_deleted
-        mapper = modFile.getLongMapper()
         for rec_type in self.target_rec_types:
             patchBlock = getattr(self.patchFile,rec_type)
             for record in getattr(modFile,rec_type).getActiveRecords():
-                fid = mapper(record.fid)
+                fid = record.fid
                 if fid not in merged_deleted: continue
-                if list(record.aiPackages) != merged_deleted[fid]['merged']:
-                    patchBlock.setRecord(record.getTypeCopy(mapper))
+                if record.aiPackages != merged_deleted[fid]['merged']:
+                    patchBlock.setRecord(record.getTypeCopy())
 
     def buildPatch(self,log,progress): # buildPatch1:no modFileTops, for type..
         """Applies delta to patchfile."""
@@ -1197,18 +1186,16 @@ class ImportRelations(_SimpleImporter):
 
     def scanModFile(self, modFile, progress): # scanModFile2
         """Scan modFile."""
-        id_relations= self.id_data
-        mapper = modFile.getLongMapper()
+        id_relations = self.id_data
         for type in ('FACT',):
             if type not in modFile.tops: continue
             patchBlock = getattr(self.patchFile,type)
             id_records = patchBlock.id_records
             for record in modFile.tops[type].getActiveRecords():
                 fid = record.fid
-                if not record.longFids: fid = mapper(fid)
                 if fid in id_records: continue
                 if fid not in id_relations: continue
-                patchBlock.setRecord(record.getTypeCopy(mapper))
+                patchBlock.setRecord(record.getTypeCopy())
 
     def _inner_loop(self, keep, records, top_mod_rec, type_count,
                     __attrgetters=_attrgetters):
@@ -1409,11 +1396,11 @@ class ImportInventory(_AImportInventory, ImportPatcher):
         """Get data from source files."""
         if not self.isActive or not self.srcs: return
         inv_types = bush.game.inventoryTypes
-        loadFactory = LoadFactory(False, *inv_types)
+        loadFactory = LoadFactory(False, *inv_types) # load only headers!
         progress.setFull(len(self.srcs))
         for index,srcMod in enumerate(self.srcs):
-            srcInfo = self.patchFile.p_file_minfos[srcMod]
-            srcFile = ModFile(srcInfo,loadFactory)
+            srcFile = ModFile(self.patchFile.p_file_minfos[srcMod],
+                              loadFactory)
             srcFile.load(True)
             mapper = srcFile.getLongMapper()
             for block in inv_types:
@@ -1435,12 +1422,10 @@ class ImportInventory(_AImportInventory, ImportPatcher):
         touched = self.touched
         id_deltas = self.id_deltas
         mod_id_entries = self.mod_id_entries
-        mapper = modFile.getLongMapper()
         modName = modFile.fileInfo.name
         #--Master or source?
         if modName in self._masters_and_srcs:
             id_entries = mod_id_entries[modName] = {}
-            modFile.convertToLongFids(bush.game.inventoryTypes)
             for inv_type in bush.game.inventoryTypes:
                 for record in getattr(modFile,inv_type).getActiveRecords():
                     if record.fid in touched:
@@ -1486,12 +1471,12 @@ class ImportInventory(_AImportInventory, ImportPatcher):
                 patchBlock = getattr(self.patchFile,inv_type)
                 id_records = patchBlock.id_records
                 for record in getattr(modFile,inv_type).getActiveRecords():
-                    fid = mapper(record.fid)
+                    fid = record.fid
                     # Copy the defining version of each record into the BP -
                     # updating it is handled by
                     # mergeModFile/update_patch_records_from_mod
                     if fid in touched and fid not in id_records:
-                        patchBlock.setRecord(record.getTypeCopy(mapper))
+                        patchBlock.setRecord(record.getTypeCopy())
 
     def buildPatch(self,log,progress): # buildPatch1:no modFileTops, for type..
         """Applies delta to patchfile."""
@@ -1633,8 +1618,8 @@ class ImportActorsSpells(ImportPatcher):
         """Get data from source files."""
         if not self.isActive: return
         target_rec_types = self._read_write_records
-        loadFactory = LoadFactory(False, *[MreRecord.type_class[x] for x
-                                           in target_rec_types])
+        target_classes = (MreRecord.type_class[x] for x in target_rec_types)
+        loadFactory = LoadFactory(False, *target_classes)
         progress.setFull(len(self.srcs))
         cachedMasters = {}
         mer_del = self.id_merged_deleted
@@ -1647,12 +1632,10 @@ class ImportActorsSpells(ImportPatcher):
             bashTags = srcInfo.getBashTags()
             srcFile.load(True)
             srcFile.convertToLongFids(target_rec_types)
-            mapper = srcFile.getLongMapper()
             for recClass in (MreRecord.type_class[x] for x in target_rec_types):
                 if recClass.rec_sig not in srcFile.tops: continue
                 for record in srcFile.tops[recClass.rec_sig].getActiveRecords():
-                    fid = mapper(record.fid)
-                    tempData[fid] = list(record.spells)
+                    tempData[record.fid] = list(record.spells)
             for master in reversed(srcInfo.masterNames):
                 if master not in minfs: continue # or break filter mods
                 if master in cachedMasters:
@@ -1662,12 +1645,11 @@ class ImportActorsSpells(ImportPatcher):
                     masterFile.load(True)
                     masterFile.convertToLongFids(target_rec_types)
                     cachedMasters[master] = masterFile
-                mapper = masterFile.getLongMapper()
                 for block in (MreRecord.type_class[x] for x in target_rec_types):
                     if block.rec_sig not in srcFile.tops: continue
                     if block.rec_sig not in masterFile.tops: continue
                     for record in masterFile.tops[block.rec_sig].getActiveRecords():
-                        fid = mapper(record.fid)
+                        fid = record.fid
                         if fid not in tempData: continue
                         if record.spells == tempData[fid] and not u'Actors.SpellsForceAdd' in bashTags:
                             # if subrecord is identical to the last master then we don't care about older masters.
@@ -1676,7 +1658,7 @@ class ImportActorsSpells(ImportPatcher):
                         if fid in mer_del:
                             if tempData[fid] == mer_del[fid]['merged']: continue
                         recordData = {'deleted':[],'merged':tempData[fid]}
-                        for spell in list(record.spells):
+                        for spell in record.spells:
                             if spell not in tempData[fid]:
                                 recordData['deleted'].append(spell)
                         if fid not in mer_del:
@@ -1744,14 +1726,13 @@ class ImportActorsSpells(ImportPatcher):
     def scanModFile(self, modFile, progress): # scanModFile2
         """Add record from modFile."""
         merged_deleted = self.id_merged_deleted
-        mapper = modFile.getLongMapper()
         for type in self._read_write_records:
             patchBlock = getattr(self.patchFile,type)
             for record in getattr(modFile,type).getActiveRecords():
-                fid = mapper(record.fid)
+                fid = record.fid
                 if fid in merged_deleted:
                     if list(record.spells) != merged_deleted[fid]['merged']:
-                        patchBlock.setRecord(record.getTypeCopy(mapper))
+                        patchBlock.setRecord(record.getTypeCopy())
 
     def buildPatch(self,log,progress): # buildPatch1:no modFileTops, for type..
         """Applies delta to patchfile."""
@@ -1875,7 +1856,6 @@ class NamesPatcher(_ANamesPatcher, ImportPatcher):
     def scanModFile(self, modFile, progress): # scanModFile0?
         """Scan modFile."""
         id_full = self.id_full
-        mapper = modFile.getLongMapper()
         for active_type in self.activeTypes:
             if active_type not in modFile.tops: continue
             patchBlock = getattr(self.patchFile, active_type)
@@ -1897,11 +1877,10 @@ class NamesPatcher(_ANamesPatcher, ImportPatcher):
                 setter = patchBlock.setRecord
             for record in activeRecords:
                 fid = record.fid
-                if not record.longFids: fid = mapper(fid)
                 if fid in id_records: continue
                 if fid not in id_full: continue # not a name
                 if record.full != id_full[fid]:
-                    setter(record.getTypeCopy(mapper))
+                    setter(record.getTypeCopy())
 
     def buildPatch(self,log,progress):# buildPatch0
         """Make changes to patchfile."""
@@ -2060,7 +2039,6 @@ class NpcFacePatcher(_ANpcFacePatcher,ImportPatcher):
         if not self.isActive or modName in self.srcs or 'NPC_' not in modFile.tops:
             return
         faceData,patchNpcs = self.faceData,self.patchFile.NPC_
-        modFile.convertToLongFids(('NPC_',))
         for npc in modFile.NPC_.getActiveRecords():
             if npc.fid in faceData:
                 patchNpcs.setRecord(npc)
@@ -2237,7 +2215,6 @@ class StatsPatcher(_AStatsPatcher, ImportPatcher):
     def scanModFile(self, modFile, progress): # scanModFile4: ?
         """Add affected items to patchFile."""
         fid_attr_value = self.fid_attr_value
-        mapper = modFile.getLongMapper()
         for group in self.activeTypes:
             if group not in modFile.tops: continue
             attrs = self.class_attrs[group]
@@ -2245,13 +2222,12 @@ class StatsPatcher(_AStatsPatcher, ImportPatcher):
             id_records = patchBlock.id_records
             for record in getattr(modFile,group).getActiveRecords():
                 longid = record.fid
-                if not record.longFids: longid = mapper(longid)
                 if longid in id_records: continue
-                itemStats = fid_attr_value.get(longid,None)
+                itemStats = fid_attr_value.get(longid)
                 if not itemStats: continue
                 oldValues = dict(zip(attrs,map(record.__getattribute__,attrs)))
                 if oldValues != itemStats:
-                    patchBlock.setRecord(record.getTypeCopy(mapper))
+                    patchBlock.setRecord(record.getTypeCopy())
 
     def buildPatch(self,log,progress):# buildPatch2 !!!!
         """Adds merged lists to patchfile."""
@@ -2356,7 +2332,6 @@ class SpellsPatcher(ImportPatcher, _ASpellsPatcher):
         spell_attrs = self.spell_attrs
         patchBlock = self.patchFile.SPEL
         id_records = patchBlock.id_records
-        modFile.convertToLongFids(('SPEL',))
         for record in modFile.SPEL.getActiveRecords():
             fid = record.fid
             if fid in id_records: continue

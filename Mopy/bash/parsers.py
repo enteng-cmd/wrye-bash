@@ -1757,6 +1757,7 @@ class ItemStats(object):
         loadFactory = LoadFactory(True,*typeClasses)
         modFile = ModFile(modInfo,loadFactory)
         modFile.load(True)
+        modFile.convertToLongFids(list(self.class_fid_attr_value))
         changed = Counter() #--changed[modName] = numChanged
         for group, fid_attr_value in self.class_fid_attr_value.iteritems():
             attrs = self.class_attrs[group]
