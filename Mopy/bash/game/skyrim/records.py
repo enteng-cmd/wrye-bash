@@ -39,7 +39,7 @@ from ...brec import MelRecord, MelObject, MelGroups, MelStruct, FID, \
     MelPartialCounter, MelBounds, null1, null2, null3, null4, MelSequential, \
     MelTruncatedStruct, MelIcons, MelIcons2, MelIcon, MelIco2, MelEdid, \
     MelFull, MelArray, MelWthrColors, GameDecider, MelReadOnly, \
-    mel_cdta_unpackers
+    mel_cdta_unpackers, MreDialBase
 from ...exception import BoltError, ModError, ModSizeError, StateError
 # Set MelModel in brec but only if unset, otherwise we are being imported from
 # fallout4.records
@@ -2100,7 +2100,7 @@ class MreDebr(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreDial(brec.MreDial):
+class MreDial(MreDialBase):
     """Dialogue."""
 
     DialTopicFlags = Flags(0, Flags.getNames(
