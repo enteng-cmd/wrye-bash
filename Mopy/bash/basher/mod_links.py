@@ -602,7 +602,7 @@ class Mod_ShowReadme(OneItemLink):
     def Execute(self):
         if not Link.Frame.docBrowser:
             DocBrowser().show_frame()
-            bass.settings['bash.modDocs.show'] = True
+            bass.settings[u'bash.modDocs.show'] = True
         Link.Frame.docBrowser.SetMod(self._selected_item)
         Link.Frame.docBrowser.raise_frame()
 
@@ -1149,7 +1149,7 @@ class Mod_Patch_Update(TransLink, _Mod_Patch_Update):
         """Return a radio button if CBash is enabled a simple item
         otherwise."""
         enable = len(selection) == 1 and bosh.modInfos[selection[0]].isBP()
-        if enable and bass.settings['bash.CBashEnabled']:
+        if enable and bass.settings[u'bash.CBashEnabled']:
             class _RadioLink(RadioLink, _Mod_Patch_Update):
                 def _check(self): return not self.CBashMismatch
             return _RadioLink(self.doCBash)
@@ -1187,7 +1187,7 @@ class Mod_ListPatchConfig(_Mod_BP_Link):
         log.setHeader(u'== '+_(u'Patch Mode'))
         clip.write(u'== '+_(u'Patch Mode')+u'\n')
         if doCBash:
-            if bass.settings['bash.CBashEnabled']:
+            if bass.settings[u'bash.CBashEnabled']:
                 msg = u'CBash %s' % (CBashApi.VersionText,)
             else:
                 # It's a CBash patch config, but CBash.dll is unavailable (either by -P command line, or it's not there)
@@ -1290,7 +1290,7 @@ class Mod_ScanDirty(ItemLink):
 
     def _initData(self, window, selection):
         super(Mod_ScanDirty, self)._initData(window, selection)
-        # settings['bash.CBashEnabled'] is set once in BashApp.Init() AFTER
+        # settings[u'bash.CBashEnabled'] is set once in BashApp.Init() AFTER
         # InitLinks() is called in bash.py
         self._text = _(u'Scan for Dirty Edits') if bass.settings[
             'bash.CBashEnabled'] else _(u"Scan for UDR's")
@@ -1308,7 +1308,7 @@ class Mod_ScanDirty(ItemLink):
         log(_(u'This is a report of records that were detected as either Identical To Master (ITM) or a deleted reference (UDR).')
             + u'\n')
         # Change a FID to something more usefull for displaying
-        if bass.settings['bash.CBashEnabled']:
+        if bass.settings[u'bash.CBashEnabled']:
             def strFid(form_id):
                 return u'%s: %06X' % (form_id[0], form_id[1])
         else:
@@ -1324,7 +1324,7 @@ class Mod_ScanDirty(ItemLink):
             udrs,itms,fog = ret[i]
             if modInfo.name == GPath(u'Unofficial Oblivion Patch.esp'):
                 # Record for non-SI users, shows up as ITM if SI is installed (OK)
-                if bass.settings['bash.CBashEnabled']:
+                if bass.settings[u'bash.CBashEnabled']:
                     itms.discard(FormID(GPath(u'Oblivion.esm'),0x00AA3C))
                 else:
                     itms.discard((GPath(u'Oblivion.esm'),0x00AA3C))
@@ -1355,7 +1355,7 @@ class Mod_ScanDirty(ItemLink):
                         item = u'%s - %s attached to Exterior CELL (%s), attached to WRLD (%s)%s' % (
                             strFid(udr.fid),udr.type,parentStr,parentParentStr,atPos)
                     dirty[pos] += u'    * %s\n' % item
-                if not bass.settings['bash.CBashEnabled']: continue
+                if not bass.settings[u'bash.CBashEnabled']: continue
                 if itms:
                     dirty[pos] += u'  * %s: %i\n' % (_(u'ITM'),len(itms))
                 for fi in sorted(itms):
@@ -2039,17 +2039,17 @@ class Mod_Scripts_Export(_Mod_Export_Link):
         defaultPath = bass.dirs[u'patches'].join(fileName.s + u' Exported Scripts')
         def OnOk():
             dialog.accept_modal()
-            bass.settings['bash.mods.export.deprefix'] = gdeprefix.text_content.strip()
-            bass.settings['bash.mods.export.skip'] = gskip.text_content.strip()
-            bass.settings['bash.mods.export.skipcomments'] = gskipcomments.is_checked
+            bass.settings[u'bash.mods.export.deprefix'] = gdeprefix.text_content.strip()
+            bass.settings[u'bash.mods.export.skip'] = gskip.text_content.strip()
+            bass.settings[u'bash.mods.export.skipcomments'] = gskipcomments.is_checked
         dialog = DialogWindow(Link.Frame, _(u'Export Scripts Options'))
         gskip = TextField(dialog)
         gdeprefix = TextField(dialog)
         gskipcomments = CheckBox(dialog, _(u'Filter Out Comments'),
           chkbx_tooltip=_(u"If active doesn't export comments in the scripts"))
-        gskip.text_content = bass.settings['bash.mods.export.skip']
-        gdeprefix.text_content = bass.settings['bash.mods.export.deprefix']
-        gskipcomments.is_checked = bass.settings['bash.mods.export.skipcomments']
+        gskip.text_content = bass.settings[u'bash.mods.export.skip']
+        gdeprefix.text_content = bass.settings[u'bash.mods.export.deprefix']
+        gskipcomments.is_checked = bass.settings[u'bash.mods.export.skipcomments']
         msg = [_(u'Remove prefix from file names i.e. enter cob to save '
                  u'script cobDenockInit'),
                _(u'as DenockInit.ext rather than as cobDenockInit.ext'),
@@ -2083,9 +2083,9 @@ class Mod_Scripts_Export(_Mod_Export_Link):
         scriptText = self._parser()
         scriptText.readFromMod(fileInfo,fileName.s)
         exportedScripts = scriptText.writeToText(fileInfo,
-            bass.settings['bash.mods.export.skip'], textDir,
-            bass.settings['bash.mods.export.deprefix'], fileName.s,
-            bass.settings['bash.mods.export.skipcomments'])
+            bass.settings[u'bash.mods.export.skip'], textDir,
+            bass.settings[u'bash.mods.export.deprefix'], fileName.s,
+            bass.settings[u'bash.mods.export.skipcomments'])
         #finally:
         self._showLog(exportedScripts, title=_(u'Export Scripts'),
                       asDialog=True)
