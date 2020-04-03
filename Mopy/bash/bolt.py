@@ -1151,11 +1151,14 @@ class AFile(object):
     @abs_path.setter
     def abs_path(self, val): self._file_key = val
 
-    def do_update(self):
-        """Check cache, reset it if needed. Return True if reset else False."""
+    def do_update(self, raise_on_error=False):
+        """Check cache, reset it if needed. Return True if reset else False.
+        Return also False on deleted files except if raise_on_error is True,
+        whereupon raise the OSError we got in stat()."""
         try:
             stat_tuple = self._stat_tuple()
         except OSError:
+            if raise_on_error: raise
             self._reset_cache(self._null_stat, load_cache=False)
             return False # we should not call do_update on deleted files
         if self._file_changed(stat_tuple):

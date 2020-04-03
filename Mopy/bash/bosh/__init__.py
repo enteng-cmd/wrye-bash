@@ -43,7 +43,7 @@ from functools import wraps, partial
 from itertools import imap
 #--Local
 from ._mergeability import isPBashMergeable, isCBashMergeable, is_esl_capable
-from .mods_metadata import ConfigHelpers
+from .mods_metadata import ConfigHelpers, get_tags_from_dir
 from .. import bass, bolt, balt, bush, env, load_order, archives, \
     initialization
 from .. import patcher # for configIsCBash()
@@ -556,7 +556,7 @@ class ModInfo(FileInfo):
         tags -= removed
         # Tags from Data/BashTags/{self.name}.txt take precedence over both
         # the description and LOOT
-        added, removed = configHelpers.get_tags_from_dir(self.name)
+        added, removed = get_tags_from_dir(self.name)
         tags |= added
         tags -= removed
         # Filter out unknown tags and store the result
@@ -2272,7 +2272,7 @@ class ModInfos(FileInfos):
         if removed:
             tagList = _tags(_(u'Removed by LOOT Masterlist and / or '
                               u'Userlist: '), sorted(removed), tagList)
-        dir_added, dir_removed = configHelpers.get_tags_from_dir(mname)
+        dir_added, dir_removed = get_tags_from_dir(mname)
         tags_file = u"'Data/BashTags/%s'" % (mname.body + u'.txt')
         if dir_added:
             tagList = _tags(_(u'Added by %s: ') % tags_file, sorted(dir_added),

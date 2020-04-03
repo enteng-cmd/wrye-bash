@@ -36,8 +36,8 @@ from collections import deque
 
 from .loot_conditions import _ACondition, Comparison, ConditionAnd, \
     ConditionFunc, ConditionNot, ConditionOr
-from ..bolt import decode, deprint, LowerDict, Path
-from ..exception import LexerError, ParserError
+from ..bolt import decode, deprint, LowerDict, Path, AFile
+from ..exception import LexerError, ParserError, BoltError
 
 # Try to use the C version (way faster), if that isn't possible fall back to
 # the pure Python version
@@ -58,10 +58,52 @@ libloot_version = u'0.15.x' # The libloot version with which this
 class LOOTParser(object):
     """The main frontend for interacting with LOOT's masterlists. Provides
     methods to parse masterlists and to retrieve information from them."""
-    __slots__ = (u'_cached_masterlist',)
+    __slots__ = (
+        u'_cached_masterlist', u'_masterlist', u'_userlist', u'_taglist')
 
-    def __init__(self):
+    def __init__(self, masterlist_path, userlist_path, taglist_path):
+        """
+
+        :param masterlist_path: The path to the LOOT masterlist that should be
+            parsed.
+        :type masterlist_path: Path
+        :param userlist_path: Optional, the path to the LOOT userlist that
+            should be parsed and merged with the masterlist.
+        :type userlist_path: Path
+        :param taglist_path: the path to Bash's own cached masterlists - those
+            must always exist.
+        :type taglist_path: Path
+        """
         self._cached_masterlist = {}
+        self._masterlist  = AFile(masterlist_path)
+        self._userlist  = AFile(userlist_path)
+        self._taglist  = AFile(taglist_path)
+        self.refresh_tags_cache(_force=True)
+
+    def refresh_tags_cache(self, _force=False):
+        try:
+            if self._masterlist.do_update(raise_on_error=True) or \
+                    self._userlist.do_update() or _force:
+                args = [self._masterlist.abs_path]
+                if self._userlist.abs_path.exists(): args.append(
+                    self._userlist.abs_path)
+                self.load_lists(*args)
+                return True
+        except (OSError, yaml.YAMLError):
+        #--No masterlist or an error occurred while reading it, use the taglist
+            try:
+                if self._taglist.do_update(raise_on_error=True) or _force:
+                    self.load_lists(self._taglist.abs_path)
+                return True
+            except OSError:
+                raise BoltError(
+                    u'%s could not be found.  Please ensure Wrye Bash is '
+                    u'installed correctly.' % self._taglist.abs_path.s)
+            except yaml.YAMLError:
+                raise BoltError(
+                    u'%s could not be parsed.  Please ensure Wrye Bash is '
+                    u'installed correctly.' % self._taglist.abs_path.s)
+        return False
 
     def get_plugin_tags(self, plugin_name, catch_errors=True):
         """Retrieves added and removed tags for the specified plugin. If the

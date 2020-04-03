@@ -1636,7 +1636,7 @@ class ModDetails(_ModsSavesDetails):
                 old_tags = bashTagsDesc.copy()
                 old_tags |= added
                 old_tags -= removed
-                bosh.configHelpers.save_tags_to_dir(plugin_name, mod_tags,
+                bosh.mods_metadata.save_tags_to_dir(plugin_name, mod_tags,
                                                     old_tags)
                 _refreshUI()
         class _CopyDesc(EnabledLink):
