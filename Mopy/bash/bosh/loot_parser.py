@@ -30,6 +30,8 @@ https://loot-api.readthedocs.io/en/latest/metadata/file_structure.html
 https://loot-api.readthedocs.io/en/latest/metadata/data_structures/index.html
 https://loot-api.readthedocs.io/en/latest/metadata/conditions.html."""
 
+__author__ = u'Infernio'
+
 import re
 import yaml
 from collections import deque
@@ -49,8 +51,6 @@ except ImportError:
     deprint(u'Failed to import LibYAML-based parser, falling back to Python '
             u'version')
 
-__author__ = u'Infernio'
-
 # API
 libloot_version = u'0.15.x' # The libloot version with which this
                             # implementation is compatible
@@ -58,8 +58,8 @@ libloot_version = u'0.15.x' # The libloot version with which this
 class LOOTParser(object):
     """The main frontend for interacting with LOOT's masterlists. Provides
     methods to parse masterlists and to retrieve information from them."""
-    __slots__ = (
-        u'_cached_masterlist', u'_masterlist', u'_userlist', u'_taglist')
+    __slots__ = (u'_cached_masterlist', u'_masterlist', u'_userlist',
+                 u'_taglist', u'_tagCache')
 
     def __init__(self, masterlist_path, userlist_path, taglist_path):
         """
@@ -78,9 +78,11 @@ class LOOTParser(object):
         self._masterlist  = AFile(masterlist_path)
         self._userlist  = AFile(userlist_path)
         self._taglist  = AFile(taglist_path)
-        self.refresh_tags_cache(_force=True)
+        self._refresh_tags_cache(_force=True)
+        # Old api
+        self._tagCache = {}
 
-    def refresh_tags_cache(self, _force=False):
+    def _refresh_tags_cache(self, _force=False):
         try:
             if self._masterlist.do_update(raise_on_error=True) or \
                     self._userlist.do_update() or _force:
@@ -175,6 +177,27 @@ class LOOTParser(object):
             if not catch_errors:
                 raise
             return False # Plugin has no entry in the masterlist, this is fine
+
+    # Old ConfigHelpers API -----------------------------
+    def refreshBashTags(self):
+        """Reloads tag info if file dates have changed."""
+        if self._refresh_tags_cache():
+            self._tagCache = {}
+
+    # TODO(inf) self.tagCache needs invalidation when a mod's CRC changes!
+    def getTagsInfoCache(self, modName):
+        """Gets bash tag info from the cache, or from loot_parser if it is not
+        cached."""
+        try:
+            return self._tagCache[modName]
+        except KeyError:
+            self._tagCache[modName] = self.get_plugin_tags(modName)
+            return self._tagCache[modName]
+
+    def getDirtyMessage(self, modName, mod_infos):
+        if self.is_plugin_dirty(modName, mod_infos):
+            return True, u'Contains dirty edits, needs cleaning.'
+        return False, u''
 
 # Implementation
 class _PluginEntry(object):

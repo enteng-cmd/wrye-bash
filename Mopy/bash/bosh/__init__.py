@@ -43,7 +43,8 @@ from functools import wraps, partial
 from itertools import imap
 #--Local
 from ._mergeability import isPBashMergeable, isCBashMergeable, is_esl_capable
-from .mods_metadata import ConfigHelpers, get_tags_from_dir
+from .loot_parser import LOOTParser, libloot_version
+from .mods_metadata import get_tags_from_dir
 from .. import bass, bolt, balt, bush, env, load_order, archives, \
     initialization
 from .. import patcher # for configIsCBash()
@@ -89,7 +90,7 @@ iniInfos = None    # type: INIInfos
 bsaInfos = None    # type: BSAInfos
 screen_infos = None # type: ScreenInfos
 #--Config Helper files (LOOT Master List, etc.)
-configHelpers = None # type: mods_metadata.ConfigHelpers
+lootDb = None # type: LOOTParser
 
 #--Header tags
 reVersion = re.compile(
@@ -551,7 +552,7 @@ class ModInfo(FileInfo):
         tags = set()
         tags |= self.getBashTagsDesc()
         # Tags from LOOT take precendence over the description
-        added, removed = configHelpers.getTagsInfoCache(self.name)
+        added, removed = lootDb.getTagsInfoCache(self.name)
         tags |= added
         tags -= removed
         # Tags from Data/BashTags/{self.name}.txt take precedence over both
@@ -2265,7 +2266,7 @@ class ModInfos(FileInfos):
         if tags_desc:
             tagList = _tags(_(u'From Plugin Description: '), sorted(tags_desc),
                             tagList)
-        tags, removed = configHelpers.getTagsInfoCache(mname)
+        tags, removed = lootDb.getTagsInfoCache(mname)
         if tags:
             tagList = _tags(_(u'From LOOT Masterlist and / or Userlist: '),
                             sorted(tags), tagList)
@@ -2471,7 +2472,7 @@ class ModInfos(FileInfos):
         """Returns a dirty message from LOOT."""
         if self.table.getItem(modname, 'ignoreDirty', False):
             return False, u''
-        return configHelpers.getDirtyMessage(modname, self)
+        return lootDb.getDirtyMessage(modname, self)
 
     def ini_files(self):
         iniFiles = self._plugin_inis.values() # in active order
@@ -3277,8 +3278,14 @@ def initBosh(bashIni, game_ini_path):
     # Setup loot_parser, needs to be done after the dirs are initialized
     if not initialization.bash_dirs_initialized:
         raise BoltError(u'initBosh: Bash dirs are not initialized')
-    global configHelpers
-    configHelpers = ConfigHelpers()
+    loot_path = bass.dirs['userApp'].join(os.pardir, u'LOOT', bush.game.fsName)
+    lootMasterPath = loot_path.join(u'masterlist.yaml')
+    lootUserPath = loot_path.join(u'userlist.yaml')
+    tagList = bass.dirs['defaultPatches'].join(u'taglist.yaml')
+    global lootDb
+    lootDb = LOOTParser(lootMasterPath, lootUserPath, tagList)
+    deprint(u'Initialized loot_parser, compatible with libloot '
+            u'v%s' % libloot_version)
     # game ini files
     deprint(u'Looking for main game INI at %s' % game_ini_path)
     global oblivionIni, gameInis

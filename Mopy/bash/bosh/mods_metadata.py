@@ -22,58 +22,13 @@
 #
 # =============================================================================
 from __future__ import division
-import os
 
 from ._mergeability import is_esl_capable
-from .loot_parser import libloot_version, LOOTParser
 from .. import balt, bolt, bush, bass, load_order
 from ..bolt import GPath, deprint, sio, struct_pack, struct_unpack
 from ..brec import ModReader, MreRecord, RecordHeader
 from ..cint import ObBaseRecord, ObCollection
 from ..exception import CancelError, ModError
-
-lootDb = None # type: LOOTParser
-
-#------------------------------------------------------------------------------
-class ConfigHelpers(object):
-    """Encapsulates info from mod configuration helper files (LOOT masterlist, etc.)"""
-
-    def __init__(self):
-        """bass.dir must have been initialized"""
-        # LOOT stores the masterlist/userlist in a %LOCALAPPDATA% subdirectory.
-        loot_path = bass.dirs['userApp'].join(os.pardir, u'LOOT', bush.game.fsName)
-        lootMasterPath = loot_path.join(u'masterlist.yaml')
-        lootUserPath = loot_path.join(u'userlist.yaml')
-        tagList = bass.dirs['defaultPatches'].join(u'taglist.yaml')
-        global lootDb
-        lootDb = LOOTParser(lootMasterPath, lootUserPath, tagList)
-        deprint(u'Initialized loot_parser, compatible with libloot '
-                u'v%s' % libloot_version)
-        #--Bash Tags
-        self.tagCache = {}
-
-    def refreshBashTags(self):
-        """Reloads tag info if file dates have changed."""
-        if lootDb.refresh_tags_cache():
-            self.tagCache = {}
-
-    # TODO(inf) self.tagCache needs invalidation when a mod's CRC changes!
-    def getTagsInfoCache(self, modName):
-        """Gets bash tag info from the cache, or from loot_parser if it is not
-        cached."""
-        if modName not in self.tagCache:
-            tags = lootDb.get_plugin_tags(modName)
-            self.tagCache[modName] = tags
-            return tags
-        else:
-            return self.tagCache[modName]
-
-    @staticmethod
-    def getDirtyMessage(modName, mod_infos):
-        if lootDb.is_plugin_dirty(modName, mod_infos):
-            return True, 'Contains dirty edits, needs cleaning.'
-        else:
-            return False, ''
 
 # BashTags dir ----------------------------------------------------------------
 def get_tags_from_dir(plugin_name):
