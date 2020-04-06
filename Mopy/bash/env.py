@@ -295,13 +295,13 @@ def test_permissions(path, permissions=u'rwcd'):
         if u'r' in permissions and path_exists:
             smallestFile = getSmallest()
             if smallestFile:
-                with smallestFile.open('rb'):
+                with smallestFile.open(u'rb'):
                     pass
         #--Test write permissions
         if u'w' in permissions and path_exists:
             smallestFile = smallestFile or getSmallest()
             if smallestFile:
-                with smallestFile.open('ab'):
+                with smallestFile.open(u'ab'):
                     pass
         #--Test file creation permission (only for directories)
         if u'c' in permissions:
@@ -312,7 +312,7 @@ def test_permissions(path, permissions=u'rwcd'):
                 else:
                     removeAtEnd = False
                 temp = getTemp(path)
-                with temp.open('wb'):
+                with temp.open(u'wb'):
                     pass
                 temp.remove()
                 if removeAtEnd:
@@ -727,7 +727,7 @@ def testUAC(gameDataPath):
     tmpDir = Path.tempDir()
     tempFile = tmpDir.join(u'_tempfile.tmp')
     dest = gameDataPath.join(u'_tempfile.tmp')
-    with tempFile.open('wb'): pass # create the file
+    with tempFile.open(u'wb'): pass # create the file
     try: # to move it into the Game/Data/ directory
         shellMove(tempFile, dest, silent=True)
     except AccessDeniedError:

@@ -170,13 +170,13 @@ class OmodFile(object):
             self.writeInfo(ocdDir.join(u'info.txt'), self.omod_path.stail, extractDir.join(u'readme').exists(), extractDir.join(u'script').exists())
             progress(0.47, self.omod_path.stail + u'\n' + _(u'Creating omod conversion data') + u'\nscript')
             if extractDir.join(u'script').exists():
-                with open(extractDir.join(u'script').s, 'rb') as ins:
-                    with ocdDir.join(u'script.txt').open('w') as output:
+                with open(extractDir.join(u'script').s, u'rb') as ins:
+                    with ocdDir.join(u'script.txt').open(u'w') as output:
                         output.write(_readNetString(ins))
             progress(0.48, self.omod_path.stail + u'\n' + _(u'Creating omod conversion data') + u'\nreadme.rtf')
             if extractDir.join(u'readme').exists():
-                with open(extractDir.join(u'readme').s, 'rb') as ins:
-                    with ocdDir.join(u'readme.rtf').open('w') as output:
+                with open(extractDir.join(u'readme').s, u'rb') as ins:
+                    with ocdDir.join(u'readme.rtf').open(u'w') as output:
                         output.write(_readNetString(ins))
             progress(0.49, self.omod_path.stail + u'\n' + _(u'Creating omod conversion data') + u'\nscreenshot')
             if extractDir.join(u'image').exists():
@@ -252,7 +252,7 @@ class OmodFile(object):
         # Extract data stream to an uncompressed stream
         subprogress = bolt.SubProgress(progress,0,0.3,full=dataPath.size)
         subprogress(0, self.omod_path.stail + u'\n' + _(u'Unpacking %s') % dataPath.stail)
-        with dataPath.open('rb') as ins:
+        with dataPath.open(u'rb') as ins:
             done = 0
             with open(outPath.join(dataPath.sbody+u'.tmp').s, u'wb') as output:
                 # Decoder properties
