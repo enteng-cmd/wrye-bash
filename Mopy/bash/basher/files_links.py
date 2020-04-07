@@ -30,9 +30,9 @@ from ..bolt import GPath
 from ..gui import BusyCursor
 from ..localize import format_date, unformat_date
 
-__all__ = ['Files_Unhide', 'File_Backup', 'File_Duplicate', 'File_Snapshot',
-           'File_RevertToBackup', 'File_RevertToSnapshot', 'File_ListMasters',
-           'File_Redate']
+__all__ = [u'Files_Unhide', u'File_Backup', u'File_Duplicate',
+           u'File_Snapshot', u'File_RevertToBackup', u'File_RevertToSnapshot',
+           u'File_ListMasters', u'File_Redate']
 
 #------------------------------------------------------------------------------
 # Files Links -----------------------------------------------------------------

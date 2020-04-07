@@ -26,7 +26,7 @@ from ....mod_files import ModFile, LoadFactory
 from ....patcher.patchers.base import AImportPatcher, CBash_ImportPatcher, \
     ImportPatcher
 
-__all__ = ['RoadImporter', 'CBash_RoadImporter']
+__all__ = [u'RoadImporter', u'CBash_RoadImporter']
 
 class _ARoadImporter(AImportPatcher):
     """Imports roads."""
