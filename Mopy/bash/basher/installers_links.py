@@ -285,8 +285,8 @@ class Installers_UninstallAllUnknownFiles(Installers_Link):
 # Installers BoolLinks --------------------------------------------------------
 #------------------------------------------------------------------------------
 class Installers_AutoAnneal(BoolLink):
-    _text, _bl_key, _help = _(u'Auto-Anneal'), u'bash.installers.autoAnneal', _(
-        u"Enable/Disable automatic annealing of packages.")
+    _text, _bl_key = _(u'Auto-Anneal'), u'bash.installers.autoAnneal'
+    _help = _(u"Enable/Disable automatic annealing of packages.")
 
 class Installers_AutoWizard(BoolLink):
     _text = _(u'Auto-Anneal/Install Wizards')
@@ -316,9 +316,9 @@ class Installers_AutoRefreshProjects(BoolLink):
 class Installers_AutoApplyEmbeddedBCFs(ItemLink):
     """Automatically apply Embedded BCFs to archives that have one."""
     _text = _(u'Auto-Apply Embedded BCFs')
-    _bl_key = u'bash.installers.autoApplyEmbeddedBCFs'
-    _help = _(
-        u'Automatically apply Embedded BCFs to their containing archives.')
+    _apply_bcf_key = u'bash.installers.autoApplyEmbeddedBCFs'
+    _help = _(u'Automatically apply Embedded BCFs to their containing '
+              u'archives.')
 
     @balt.conversation
     def Execute(self):
@@ -460,18 +460,20 @@ class _Installer_Sort(ItemLink):
 
 class Installers_SortActive(_Installer_Sort, BoolLink):
     """Sort by type."""
-    _text, _bl_key, _help = _(u'Sort by Active'), u'bash.installers.sortActive', _(
-        u'If selected, active installers will be sorted to the top of the '
-        u'list.')
+    _text = _(u'Sort by Active')
+    _bl_key = u'bash.installers.sortActive'
+    _help = _(u'If selected, active installers will be sorted to the top of '
+              u'the list.')
 
 class Installers_SortProjects(_Installer_Sort, BoolLink):
     """Sort dirs to the top."""
-    _text, _bl_key, _help = _(u'Projects First'), u'bash.installers.sortProjects', \
-                            _(u'If selected, projects will be sorted to the top of the list.')
+    _text = _(u'Projects First')
+    _bl_key = u'bash.installers.sortProjects'
+    _help = _(u'If selected, projects will be sorted to the top of the list.')
 
 class Installers_SortStructure(_Installer_Sort, BoolLink):
     """Sort by type."""
-    _text, _bl_key = _(u'Sort by Structure'), 'bash.installers.sortStructure'
+    _text, _bl_key = _(u'Sort by Structure'), u'bash.installers.sortStructure'
 
 #------------------------------------------------------------------------------
 # Installers_Skip Links -------------------------------------------------------
