@@ -41,9 +41,7 @@ _ignored_chars=frozenset(u'+-=.()[]')
 class _ANamesTweak(AMultiTweakItem):
     """Shared code of PBash/CBash names tweaks and hasty abstraction over
     CBash/PBash differences to allow moving duplicate code into _A classes."""
-    def __init__(self):
-        super(_ANamesTweak, self).__init__()
-        self.logMsg = u'* '+_(u'Items Renamed: %d')
+    tweak_log_msg = _(u'Items Renamed: %(total_changed)d')
 
     @property
     def chosen_format(self): return self.choiceValues[self.chosen][0]
@@ -445,10 +443,7 @@ class _ANamesTweak_Spells(_AMgefNamesTweak):
                      (_(u'D2. Fire Ball'),  u'%s%d. '),
                      (_(u'D2 - Fire Ball'), u'%s%d - '),
                      (_(u'(D2) Fire Ball'), u'(%s%d) ')]
-
-    def __init__(self):
-        super(_ANamesTweak_Spells, self).__init__()
-        self.logMsg = u'* '+_(u'Spells Renamed: %d')
+    tweak_log_msg = _(u'Spells Renamed: %(total_changed)d')
 
     def wants_record(self, record):
         return record.spellType == 0 and super(
