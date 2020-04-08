@@ -123,8 +123,15 @@ class _AUnblockTweak(AClothesTweak):
         super(_AUnblockTweak, self).__init__(tweak_name, tweak_tip, tweak_key,
                                              *tweak_choices)
         self.logMsg = u'* ' + _(u'Clothes Tweaked: %d')
-        self.unblock_flags = self.clothes_flags[
-            tweak_key[tweak_key.rfind(u'.') + 1:]]
+
+    @property
+    def unblock_flags(self):
+        try:
+            return self._unblock_flags
+        except AttributeError:
+            self._unblock_flags = self.clothes_flags[
+                self.tweak_key[self.tweak_key.rfind(u'.') + 1:]]
+        return self._unblock_flags
 
     def wants_record(self, record):
         return super(_AUnblockTweak, self).wants_record(
