@@ -203,8 +203,16 @@ class AMultiTweakItem(object):
     # either 24 or 48 will be returned, which the tweak could use to e.g.
     # change a record attribute controlling how long a quest is delayed.
     tweak_choices = []
+    # If True, this tweak will be checked by default
+    default_enabled = False
 
-    def __init__(self, defaultEnabled=False):
+    def __init__(self):
+        # Don't check tweak_log_msg, settings tweaks don't use it
+        for tweak_attr in (u'tweak_name', u'tweak_tip', u'tweak_key'):
+            if getattr(self, tweak_attr) == u'OVERRIDE':
+                self._raise_tweak_syntax_error(u"A '%s' attribute is still "
+                                               u'set to the default '
+                                               u"('OVERRIDE')" % tweak_attr)
         # TODO: docs for attributes below! - done for static ones above
         self.choiceLabels = []
         self.choiceValues = []
@@ -236,7 +244,6 @@ class AMultiTweakItem(object):
             self.default = 0 # no explicit default item, so default to first
         #--Config
         self.isEnabled = False
-        self.defaultEnabled = defaultEnabled
         self.chosen = 0
         #--Log
         self.logHeader = u'=== '+ self.tweak_name
@@ -250,7 +257,7 @@ class AMultiTweakItem(object):
 
     def init_tweak_config(self, configs):
         """Get config from configs dictionary and/or set to default."""
-        self.isEnabled,self.chosen = self.defaultEnabled,0
+        self.isEnabled, self.chosen = self.default_enabled, 0
         self._isNew = not (self.tweak_key in configs)
         if not self._isNew:
             self.isEnabled,value = configs[self.tweak_key]
@@ -307,13 +314,12 @@ class AMultiTweakItem(object):
 class DynamicTweak(AMultiTweakItem):
     """A tweak that has its name, tip, key and choices passed in as init
     parameters."""
-    def __init__(self, tweak_name, tweak_tip, tweak_key, *tweak_choices,
-                 **kwargs):
+    def __init__(self, tweak_name, tweak_tip, tweak_key, *tweak_choices):
         self.tweak_name = tweak_name
         self.tweak_tip = tweak_tip
         self.tweak_key = tweak_key
         self.tweak_choices = list(tweak_choices)
-        super(DynamicTweak, self).__init__(**kwargs)
+        super(DynamicTweak, self).__init__()
 
     def __repr__(self):  return u'%s(%s)' % (
         self.__class__.__name__, self.tweak_name)
