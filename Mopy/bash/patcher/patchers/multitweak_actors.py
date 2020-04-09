@@ -552,9 +552,8 @@ class OppositeGenderAnimsPatcher_Male(_AOppositeGenderAnimsPatcher):
 class TweakActors(MultiTweaker):
     """Sets Creature stuff or NPC Skeletons, Animations or other settings to
     better work with mods or avoid bugs."""
-    _tweak_classes = sorted(
-        [globals()[tweak_name] for tweak_name in bush.game.actor_tweaks],
-        key=lambda a: a.tweak_name.lower())
+    _tweak_classes =  [globals()[tweak_name] for tweak_name
+                       in bush.game.actor_tweaks]
 
 class CBash_TweakActors(CBash_MultiTweaker):
     """Sets Creature stuff or NPC Skeletons, Animations or other settings to
