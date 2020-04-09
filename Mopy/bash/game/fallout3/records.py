@@ -41,7 +41,7 @@ from ...brec import MelRecord, MelGroups, MelStruct, FID, MelGroup, \
     MelSequential, MelTruncatedStruct, PartialLoadDecider, MelReadOnly, \
     MelCoordinates, MelIcons, MelIcons2, MelIcon, MelIco2, MelEdid, MelFull, \
     MelArray, MelWthrColors, MreLeveledListBase, MreDialBase, MreActorBase, \
-    MreWithItems, MelCtdaFo3, MelRef3D, MelXlod
+    MreWithItems, MelCtdaFo3, MelRef3D, MelXlod, BipedFlags
 from ...exception import ModError, ModSizeError
 # Set MelModel in brec but only if unset
 if brec.MelModel is None:
@@ -99,19 +99,6 @@ class MreActor(MreActorBase):
         'useScript',
     ))
     __slots__ = []
-
-#------------------------------------------------------------------------------
-class MelBipedFlags(Flags):
-    """Biped flags element. Includes biped flag set by default."""
-    mask = 0xFFFF
-    def __init__(self,default=0,newNames=None):
-        names = Flags.getNames(
-            'head', 'hair', 'upperBody', 'leftHand', 'rightHand', 'weapon',
-            'pipboy', 'backpack', 'necklace', 'headband', 'hat', 'eyeGlasses',
-            'noseRing', 'earrings', 'mask', 'choker', 'mouthObject',
-            'bodyAddOn1', 'bodyAddOn2', 'bodyAddOn3')
-        if newNames: names.update(newNames)
-        Flags.__init__(self,default,names)
 
 #------------------------------------------------------------------------------
 class MelConditions(MelGroups):
@@ -491,7 +478,7 @@ class MreArma(MelRecord):
     """Armor Addon."""
     classType = b'ARMA'
 
-    _flags = MelBipedFlags(0)
+    _flags = BipedFlags()
     _dnamFlags = Flags(0, Flags.getNames(
         (0,'modulatesVoice'),
     ))
@@ -523,8 +510,7 @@ class MreArmo(MelRecord):
     """Armor."""
     classType = b'ARMO'
 
-    _flags = MelBipedFlags(0, Flags.getNames())
-
+    _flags = BipedFlags()
     _dnamFlags = Flags(0, Flags.getNames(
         (0,'modulatesVoice'),
     ))

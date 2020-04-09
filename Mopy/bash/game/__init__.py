@@ -310,6 +310,8 @@ class GameInfo(object):
         # If True, generate ONAM by reading each temp CELL child when adding
         # the ESM flag to plugins and discard it when removing the ESM flag.
         generate_temp_child_onam = False
+        # A tuple containing all biped flag names (in order) for this game
+        biped_flag_names = ()
 
     # Bash Tags supported by this game
     allTags = set()
