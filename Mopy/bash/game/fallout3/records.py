@@ -32,15 +32,15 @@ from ...bolt import Flags, struct_unpack, struct_pack
 from ...brec import MelRecord, MelGroups, MelStruct, FID, MelGroup, \
     MelString, MelSet, MelFid, MelOptStruct, MelFids, MreHeaderBase, \
     MelBase, MelUnicode, MelFidList, MreGmstBase, MelStrings, MelMODS, \
-    MreHasEffects, MelReferences, MelColorInterpolator, MelValueInterpolator, \
-    MelUnion, AttrValDecider, MelRegnEntrySubrecord, SizeDecider, MelFloat, \
-    MelSInt8, MelSInt16, MelSInt32, MelUInt8, MelUInt16, MelUInt32, \
-    MelOptFid, MelOptFloat, MelOptSInt16, MelOptSInt32, MelOptUInt8, \
-    MelOptUInt16, MelOptUInt32, MelPartialCounter, MelRaceParts, \
-    MelRaceVoices, MelBounds, null1, null2, null3, null4, MelScriptVars, \
-    MelSequential, MelTruncatedStruct, PartialLoadDecider, MelReadOnly, \
-    MelCoordinates, MelIcons, MelIcons2, MelIcon, MelIco2, MelEdid, MelFull, \
-    MelArray, MelWthrColors, MreLeveledListBase, MreDialBase, MreActorBase, \
+    MelReferences, MelColorInterpolator, MelValueInterpolator, MelUnion, \
+    AttrValDecider, MelRegnEntrySubrecord, SizeDecider, MelFloat, MelSInt8, \
+    MelSInt16, MelSInt32, MelUInt8, MelUInt16, MelUInt32, MelOptFid, \
+    MelOptFloat, MelOptSInt16, MelOptSInt32, MelOptUInt8, MelOptUInt16, \
+    MelOptUInt32, MelPartialCounter, MelRaceParts, MelRaceVoices, MelBounds, \
+    null1, null2, null3, null4, MelScriptVars, MelSequential, \
+    MelTruncatedStruct, PartialLoadDecider, MelReadOnly, MelCoordinates, \
+    MelIcons, MelIcons2, MelIcon, MelIco2, MelEdid, MelFull, MelArray, \
+    MelWthrColors, MreLeveledListBase, MreDialBase, MreActorBase, \
     MreWithItems, MelCtdaFo3, MelRef3D, MelXlod, BipedFlags
 from ...exception import ModError, ModSizeError
 # Set MelModel in brec but only if unset
@@ -413,7 +413,7 @@ class MreAddn(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreAlch(MelRecord,MreHasEffects):
+class MreAlch(MelRecord):
     """Ingestible."""
     classType = b'ALCH'
 
@@ -1157,7 +1157,7 @@ class MreEfsh(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreEnch(MelRecord,MreHasEffects):
+class MreEnch(MelRecord):
     """Object Effect."""
     classType = b'ENCH'
 
@@ -1554,7 +1554,7 @@ class MreInfo(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreIngr(MelRecord,MreHasEffects):
+class MreIngr(MelRecord):
     """Ingredient."""
     classType = b'INGR'
 
@@ -2886,7 +2886,7 @@ class MreSoun(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreSpel(MelRecord,MreHasEffects):
+class MreSpel(MelRecord):
     """Actor Effect"""
     classType = b'SPEL'
 
