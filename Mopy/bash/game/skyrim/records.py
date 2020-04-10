@@ -30,7 +30,7 @@ from ...bolt import Flags, encode, struct_pack, struct_unpack
 from ...brec import MelRecord, MelObject, MelGroups, MelStruct, FID, \
     MelGroup, MelString, MreLeveledListBase, MelSet, MelFid, MelNull, \
     MelOptStruct, MelFids, MreHeaderBase, MelBase, MelUnicode, MelFidList, \
-    MreGmstBase, MelLString, MelMODS, MreHasEffects, MelColorInterpolator, \
+    MreGmstBase, MelLString, MelMODS, MelColorInterpolator, \
     MelValueInterpolator, MelUnion, AttrValDecider, MelRegnEntrySubrecord, \
     PartialLoadDecider, FlagDecider, MelFloat, MelSInt8, MelSInt32, MelUInt8, \
     MelUInt16, MelUInt32, MelOptFloat, MelOptSInt16, MelOptSInt32, \
@@ -1339,7 +1339,7 @@ class MreAddn(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreAlch(MelRecord,MreHasEffects):
+class MreAlch(MelRecord):
     """Ingestible."""
     rec_sig = b'ALCH'
 
@@ -2241,7 +2241,7 @@ class MreEfsh(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreEnch(MelRecord,MreHasEffects):
+class MreEnch(MelRecord):
     """Object Effect."""
     rec_sig = b'ENCH'
 
@@ -2839,7 +2839,7 @@ class MreImgs(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreIngr(MelRecord,MreHasEffects):
+class MreIngr(MelRecord):
     """Ingredient."""
     rec_sig = b'INGR'
 
@@ -4606,7 +4606,7 @@ class MreScen(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreScrl(MelRecord,MreHasEffects):
+class MreScrl(MelRecord):
     """Scroll."""
     rec_sig = b'SCRL'
 
@@ -4843,7 +4843,7 @@ class MreSoun(MelRecord):
     __slots__ = melSet.getSlotsUsed()
 
 #------------------------------------------------------------------------------
-class MreSpel(MelRecord,MreHasEffects):
+class MreSpel(MelRecord):
     """Spell."""
     rec_sig = b'SPEL'
 
