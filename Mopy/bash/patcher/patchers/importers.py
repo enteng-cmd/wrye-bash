@@ -901,27 +901,28 @@ class NPCAIPackagePatcher(ImportPatcher):
         self.id_merged_deleted = {}
         self.target_rec_types = bush.game.actor_types
 
-    def _insertPackage(self, data, fi, index, pkg, recordData):
-        if index == 0: data[fi]['merged'].insert(0, pkg)# insert as first item
+    def _insertPackage(self, id_merged_deleted, fi, index, pkg, recordData):
+        fi_merged = id_merged_deleted[fi]['merged']
+        if index == 0: fi_merged.insert(0, pkg)# insert as first item
         elif index == (len(recordData['merged']) - 1):
-            data[fi]['merged'].append(pkg)  # insert as last item
+            fi_merged.append(pkg)  # insert as last item
         else:  # figure out a good spot to insert it based on next or last
             # recognized item (ugly ugly ugly)
             i = index - 1
             while i >= 0:
-                if recordData['merged'][i] in data[fi]['merged']:
-                    slot = data[fi]['merged'].index(
+                if recordData['merged'][i] in fi_merged:
+                    slot = fi_merged.index(
                         recordData['merged'][i]) + 1
-                    data[fi]['merged'].insert(slot, pkg)
+                    fi_merged.insert(slot, pkg)
                     break
                 i -= 1
             else:
                 i = index + 1
                 while i != len(recordData['merged']):
-                    if recordData['merged'][i] in data[fi]['merged']:
-                        slot = data[fi]['merged'].index(
+                    if recordData['merged'][i] in fi_merged:
+                        slot = fi_merged.index(
                             recordData['merged'][i])
-                        data[fi]['merged'].insert(slot, pkg)
+                        fi_merged.insert(slot, pkg)
                         break
                     i += 1
 
@@ -1667,18 +1668,18 @@ class CBash_ImportInventory(_AImportInventory, _RecTypeModLogging):
     def scan(self,modFile,record,bashTags):
         """Records information needed to apply the patch."""
         #--Source mod?
-        masters = record.History()
-        if not masters: return
+        masters_ = record.History()
+        if not masters_: return
         entries = record.items_list
         modItems = set((item, count) for item, count in entries if
                        item.ValidateFormID(self.patchFile))
         masterEntries = []
         id_deltas = self.id_deltas
         fid = record.fid
-        for masterEntry in masters:
-            masterItems = set(
+        for masterEntry in masters_:
+            masterItems = {
                 (item, count) for item, count in masterEntry.items_list if
-                item.ValidateFormID(self.patchFile))
+                item.ValidateFormID(self.patchFile)}
             removeItems = (masterItems - modItems
                            if u'Invent.Remove' in bashTags else set())
             addItems = (modItems - masterItems
