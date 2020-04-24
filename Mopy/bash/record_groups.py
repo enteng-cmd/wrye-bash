@@ -26,7 +26,8 @@
 # Python imports
 from __future__ import division, print_function
 import struct
-from operator import itemgetter
+from itertools import chain
+from operator import itemgetter, attrgetter
 # Wrye Bash imports
 from .brec import ModReader, RecordHeader, GrupHeader, TopGrupHeader
 from .bolt import sio
@@ -221,10 +222,10 @@ class MobObjects(MobBase):
             for record in self.records:
                 record.dump(out)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
         for record in self.records:
-            record.updateMasters(masters)
+            record.updateMasters(masterset_add)
 
     def convertFids(self,mapper,toLong):
         """Converts fids between formats according to mapper.
@@ -535,29 +536,24 @@ class MobCell(MobBase):
         if self.pgrd:
             self.pgrd.convertFids(mapper,toLong)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
-        self.cell.updateMasters(masters)
-        for record in self.persistent:
-            record.updateMasters(masters)
-        for record in self.distant:
-            record.updateMasters(masters)
-        for record in self.temp:
-            record.updateMasters(masters)
+        self.cell.updateMasters(masterset_add)
+        for record in chain(self.persistent, self.distant, self.temp):
+            record.updateMasters(masterset_add)
         if self.land:
-            self.land.updateMasters(masters)
+            self.land.updateMasters(masterset_add)
         if self.pgrd:
-            self.pgrd.updateMasters(masters)
+            self.pgrd.updateMasters(masterset_add)
 
-    def updateRecords(self,srcBlock,mapper,mergeIds):
+    def updateRecords(self, srcBlock, mapper, mergeIds, __attrget=attrgetter(
+        u'cell', u'pgrd', u'land', u'persistent', u'temp', u'distant')):
         """Updates any records in 'self' that exist in 'srcBlock'."""
         mergeDiscard = mergeIds.discard
-        selfGetter = self.__getattribute__
-        srcGetter = srcBlock.__getattribute__
         selfSetter = self.__setattr__
-        for attr in ('cell','pgrd','land'):
-            myRecord = selfGetter(attr)
-            record = srcGetter(attr)
+        self_src_attrs = zip(__attrget(self), __attrget(srcBlock))
+        for attr, (myRecord, record) in zip((u'cell', u'pgrd', u'land'),
+                                          self_src_attrs):
             if myRecord and record:
                 if myRecord.fid != mapper(record.fid):
                     raise ArgumentError(u"Fids don't match! %08x, %08x" % (
@@ -566,14 +562,12 @@ class MobCell(MobBase):
                     record = record.getTypeCopy(mapper)
                     selfSetter(attr,record)
                     mergeDiscard(record.fid)
-        for attr in ('persistent','temp','distant'):
-            recordList = selfGetter(attr)
-            fids = dict(
-                (record.fid,index) for index,record in enumerate(recordList))
-            for record in srcGetter(attr):
+        for attr, (self_rec_list, src_rec_list) in zip(
+                (u'persistent', u'temp', u'distant'), self_src_attrs[3:]):
+            fids = {record.fid: i for i, record in enumerate(self_rec_list)}
+            for record in src_rec_list:
                 if not record.flags1.ignored and mapper(record.fid) in fids:
-                    record = record.getTypeCopy(mapper)
-                    recordList[fids[record.fid]] = record
+                    self_rec_list[fids[record.fid]] = record.getTypeCopy(mapper)
                     mergeDiscard(record.fid)
 
     def keepRecords(self, p_keep_ids):
@@ -712,10 +706,10 @@ class MobCells(MobBase):
             if cellBlock:
                 cellBlock.updateRecords(srcCellBlock,mapper,mergeIds)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
         for cellBlock in self.cellBlocks:
-            cellBlock.updateMasters(masters)
+            cellBlock.updateMasters(masterset_add)
 
 #------------------------------------------------------------------------------
 class MobICells(MobCells):
@@ -973,14 +967,14 @@ class MobWorld(MobCells):
             self.worldCellBlock.convertFids(mapper,toLong)
         MobCells.convertFids(self,mapper,toLong)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
-        self.world.updateMasters(masters)
+        self.world.updateMasters(masterset_add)
         if self.road:
-            self.road.updateMasters(masters)
+            self.road.updateMasters(masterset_add)
         if self.worldCellBlock:
-            self.worldCellBlock.updateMasters(masters)
-        MobCells.updateMasters(self,masters)
+            self.worldCellBlock.updateMasters(masterset_add)
+        super(MobWorld, self).updateMasters(masterset_add)
 
     def updateRecords(self,srcBlock,mapper,mergeIds):
         """Updates any records in 'self' that exist in 'srcBlock'."""
@@ -1112,10 +1106,10 @@ class MobWorlds(MobBase):
         """Indexes records by fid."""
         self.id_worldBlocks = dict((x.world.fid,x) for x in self.worldBlocks)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
         for worldBlock in self.worldBlocks:
-            worldBlock.updateMasters(masters)
+            worldBlock.updateMasters(masterset_add)
 
     def updateRecords(self,srcBlock,mapper,mergeIds):
         """Updates any records in 'self' that exist in 'srcBlock'."""

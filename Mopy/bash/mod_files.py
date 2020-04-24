@@ -356,11 +356,11 @@ class ModFile(object):
         if not self.longFids: raise StateError(u"ModFile fids not in long form.")
         for fname in bush.game.masterFiles:
             if dirs['mods'].join(fname).exists():
-                masters = MasterSet([GPath(fname)])
+                masters_set = MasterSet([GPath(fname)])
                 break
         for block in self.tops.values():
-            block.updateMasters(masters)
-        return masters.getOrdered()
+            block.updateMasters(masters_set.add)
+        return masters_set.getOrdered()
 
     def _index_mgefs(self):
         """Indexes and cache all MGEF properties and stores them for retrieval

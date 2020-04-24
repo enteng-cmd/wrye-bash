@@ -287,9 +287,9 @@ class PatchFile(_PFile, ModFile):
                 #--Include this record?
                 if doFilter:
                     record.mergeFilter(loadSet)
-                    masters = MasterSet()
-                    record.updateMasters(masters)
-                    if not loadSetIssuperset(masters):
+                    masterset = MasterSet()
+                    record.updateMasters(masterset.add)
+                    if not loadSetIssuperset(masterset):
                         continue
                 filteredAppend(record)
                 if iiSkipMerge: continue

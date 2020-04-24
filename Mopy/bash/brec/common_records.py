@@ -416,10 +416,10 @@ class MreDialBase(MelRecord):
                              self.infoStamp2).pack_head())
         for info in self.infos: info.dump(out)
 
-    def updateMasters(self,masters):
-        MelRecord.updateMasters(self,masters)
+    def updateMasters(self, masterset_add):
+        super(MreDialBase, self).updateMasters(masterset_add)
         for info in self.infos:
-            info.updateMasters(masters)
+            info.updateMasters(masterset_add)
 
     def convertFids(self,mapper,toLong):
         MelRecord.convertFids(self,mapper,toLong)
