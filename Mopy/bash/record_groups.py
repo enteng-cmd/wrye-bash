@@ -27,7 +27,7 @@
 from __future__ import division, print_function
 import struct
 from itertools import chain
-from operator import itemgetter
+from operator import itemgetter, attrgetter
 # Wrye Bash imports
 from .brec import ModReader, RecordHeader, GrupHeader, TopGrupHeader, MreRecord
 from .bolt import GPath, sio
@@ -182,7 +182,7 @@ class MobBase(object):
         :param doFilter: If True, perform merge filtering."""
         raise AbstractError
 
-    def updateMasters(self, masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
         raise AbstractError
 
@@ -254,10 +254,10 @@ class MobObjects(MobBase):
             for record in self.records:
                 record.dump(out)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
         for record in self.records:
-            record.updateMasters(masters)
+            record.updateMasters(masterset_add)
 
     def convertFids(self,mapper,toLong):
         """Converts fids between formats according to mapper.
@@ -335,9 +335,9 @@ class MobObjects(MobBase):
                 # left. If it does not, skip the whole record (because all of
                 # its contents have been merge-filtered out).
                 record.mergeFilter(loadSet)
-                masters = MasterSet()
-                record.updateMasters(masters)
-                if not loadSetIsSuperset(masters):
+                masterset = MasterSet()
+                record.updateMasters(masterset.add)
+                if not loadSetIsSuperset(masterset):
                     continue
             # We're either not Filter-tagged or we want to keep this record
             filteredAppend(record)
@@ -603,28 +603,24 @@ class MobCell(MobBase):
         if self.pgrd:
             self.pgrd.convertFids(mapper,toLong)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
-        self.cell.updateMasters(masters)
-        for record in self.persistent:
-            record.updateMasters(masters)
-        for record in self.distant:
-            record.updateMasters(masters)
-        for record in self.temp:
-            record.updateMasters(masters)
+        self.cell.updateMasters(masterset_add)
+        for record in chain(self.persistent, self.distant, self.temp):
+            record.updateMasters(masterset_add)
         if self.land:
-            self.land.updateMasters(masters)
+            self.land.updateMasters(masterset_add)
         if self.pgrd:
-            self.pgrd.updateMasters(masters)
+            self.pgrd.updateMasters(masterset_add)
 
-    def updateRecords(self,srcBlock,mapper,mergeIds):
+    def updateRecords(self, srcBlock, mapper, mergeIds, __attrget=attrgetter(
+        u'cell', u'pgrd', u'land', u'persistent', u'temp', u'distant')):
         """Updates any records in 'self' that exist in 'srcBlock'."""
         mergeDiscard = mergeIds.discard
-        selfGetter = self.__getattribute__
-        srcGetter = srcBlock.__getattribute__
-        for attr in ('cell','pgrd','land'):
-            myRecord = selfGetter(attr)
-            record = srcGetter(attr)
+        selfSetter = self.__setattr__
+        self_src_attrs = zip(__attrget(self), __attrget(srcBlock))
+        for attr, (myRecord, record) in zip((u'cell', u'pgrd', u'land'),
+                                          self_src_attrs):
             if myRecord and record:
                 if myRecord.fid != mapper(record.fid):
                     raise ArgumentError(u"Fids don't match! %08x, %08x" % (
@@ -633,13 +629,12 @@ class MobCell(MobBase):
                     record = record.getTypeCopy(mapper)
                     setattr(self, attr, record)
                     mergeDiscard(record.fid)
-        for attr in ('persistent','temp','distant'):
-            recordList = selfGetter(attr)
-            fids = {record.fid: i for i, record in enumerate(recordList)}
-            for record in srcGetter(attr):
+        for attr, (self_rec_list, src_rec_list) in zip(
+                (u'persistent', u'temp', u'distant'), self_src_attrs[3:]):
+            fids = {record.fid: i for i, record in enumerate(self_rec_list)}
+            for record in src_rec_list:
                 if not record.flags1.ignored and mapper(record.fid) in fids:
-                    record = record.getTypeCopy(mapper)
-                    recordList[fids[record.fid]] = record
+                    self_rec_list[fids[record.fid]] = record.getTypeCopy(mapper)
                     mergeDiscard(record.fid)
 
     def iter_records(self):
@@ -672,9 +667,9 @@ class MobCell(MobBase):
                 # If we're Filter-tagged, perform merge filtering first
                 if doFilter:
                     src_rec.mergeFilter(loadSet)
-                    masters = MasterSet()
-                    src_rec.updateMasters(masters)
-                    if not loadSetIsSuperset(masters):
+                    masterset = MasterSet()
+                    src_rec.updateMasters(masterset.add)
+                    if not loadSetIsSuperset(masterset):
                         # Filtered out, discard this record and skip to next
                         setattr(block, single_attr, None)
                         continue
@@ -702,9 +697,9 @@ class MobCell(MobBase):
                 # If we're Filter-tagged, perform merge filtering first
                 if doFilter:
                     src_rec.mergeFilter(loadSet)
-                    masters = MasterSet()
-                    src_rec.updateMasters(masters)
-                    if not loadSetIsSuperset(masters):
+                    masterset = MasterSet()
+                    src_rec.updateMasters(masterset.add)
+                    if not loadSetIsSuperset(masterset):
                         continue
                 # We're either not Filter-tagged or we want to keep this record
                 filtered_append(src_rec)
@@ -867,9 +862,9 @@ class MobCells(MobBase):
                 continue
             # If we're Filter-tagged, check if the child cell got filtered out
             if doFilter:
-                masters = MasterSet()
-                src_cell_block.updateMasters(masters)
-                if not loadSetIsSuperset(masters):
+                masterset = MasterSet()
+                src_cell_block.updateMasters(masterset.add)
+                if not loadSetIsSuperset(masterset):
                     # The child cell got filtered out. If it was newly added,
                     # we need to remove it from this block again. Otherwise, we
                     # can just skip forward to the next child cell.
@@ -901,10 +896,10 @@ class MobCells(MobBase):
             if cellBlock:
                 cellBlock.updateRecords(srcCellBlock,mapper,mergeIds)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
         for cellBlock in self.cellBlocks:
-            cellBlock.updateMasters(masters)
+            cellBlock.updateMasters(masterset_add)
 
 #------------------------------------------------------------------------------
 class MobICells(MobCells):
@@ -1162,14 +1157,14 @@ class MobWorld(MobCells):
             self.worldCellBlock.convertFids(mapper,toLong)
         MobCells.convertFids(self,mapper,toLong)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
-        self.world.updateMasters(masters)
+        self.world.updateMasters(masterset_add)
         if self.road:
-            self.road.updateMasters(masters)
+            self.road.updateMasters(masterset_add)
         if self.worldCellBlock:
-            self.worldCellBlock.updateMasters(masters)
-        MobCells.updateMasters(self,masters)
+            self.worldCellBlock.updateMasters(masterset_add)
+        super(MobWorld, self).updateMasters(masterset_add)
 
     def updateRecords(self,srcBlock,mapper,mergeIds):
         """Updates any records in 'self' that exist in 'srcBlock'."""
@@ -1217,9 +1212,9 @@ class MobWorld(MobCells):
                 # If we're Filter-tagged, perform merge filtering first
                 if doFilter:
                     src_rec.mergeFilter(loadSet)
-                    masters = MasterSet()
-                    src_rec.updateMasters(masters)
-                    if not loadSetIsSuperset(masters):
+                    masterset = MasterSet()
+                    src_rec.updateMasters(masterset.add)
+                    if not loadSetIsSuperset(masterset):
                         # Filtered out, discard this record and skip to next
                         setattr(block, single_attr, None)
                         continue
@@ -1253,9 +1248,9 @@ class MobWorld(MobCells):
             elif doFilter:
                 # If we're Filter-tagged, check if the world cell block got
                 # filtered out
-                masters = MasterSet()
-                self.worldCellBlock.updateMasters(masters)
-                if not loadSetIsSuperset(masters):
+                masterset = MasterSet()
+                self.worldCellBlock.updateMasters(masterset.add)
+                if not loadSetIsSuperset(masterset):
                     # The cell block got filtered out. If it was newly added,
                     # we need to remove it from this block again.
                     if was_newly_added:
@@ -1359,10 +1354,10 @@ class MobWorlds(MobBase):
         """Indexes records by fid."""
         self.id_worldBlocks = dict((x.world.fid,x) for x in self.worldBlocks)
 
-    def updateMasters(self,masters):
+    def updateMasters(self, masterset_add):
         """Updates set of master names according to masters actually used."""
         for worldBlock in self.worldBlocks:
-            worldBlock.updateMasters(masters)
+            worldBlock.updateMasters(masterset_add)
 
     def updateRecords(self,srcBlock,mapper,mergeIds):
         """Updates any records in 'self' that exist in 'srcBlock'."""
@@ -1439,9 +1434,9 @@ class MobWorlds(MobBase):
                 continue
             # If we're Filter-tagged, check if the child world got filtered out
             if doFilter:
-                masters = MasterSet()
-                src_world_block.updateMasters(masters)
-                if not loadSetIsSuperset(masters):
+                masterset = MasterSet()
+                src_world_block.updateMasters(masterset.add)
+                if not loadSetIsSuperset(masterset):
                     # The child world got filtered out. If it was newly added,
                     # we need to remove it from this block again. Otherwise, we
                     # can just skip forward to the next child world.
