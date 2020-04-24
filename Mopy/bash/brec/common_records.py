@@ -35,7 +35,7 @@ from .basic_elements import MelBase, MelFid, MelFloat, MelGroups, MelLString, \
     MelNull, MelStruct, MelUInt32, MelSInt32
 from .common_subrecords import MelEdid
 from .mod_io import RecordHeader
-from .mod_structs import MelRecord, MelSet, MreRecord
+from .record_structs import MelRecord, MelSet, MreRecord
 from .utils_constants import FID
 from .. import bolt, exception
 from ..bolt import decode, encode, GPath, sio
