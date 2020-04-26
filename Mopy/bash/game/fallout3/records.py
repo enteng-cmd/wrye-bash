@@ -63,7 +63,7 @@ if brec.MelModel is None:
 
         def __init__(self, attr='model', index=0, with_facegen_flags=True):
             """Initialize. Index is 0,2,3,4 for corresponding type id."""
-            types = self.__class__.typeSets[(0, index - 1)[index > 0]]
+            types = self.__class__.typeSets[index - 1 if index > 0 else 0]
             model_elements = [
                 MelString(types[0], 'modPath'),
                 MelBase(types[1], 'modb_p'),
@@ -1008,13 +1008,10 @@ class MreDebr(MelRecord):
                 raise ModError(ins.inName,u'Unexpected subrecord: %s' % readId)
             (record.flags,) = struct_unpack(u'B',byte_data[-1])
 
-        def dumpData(self,record,out):
-            data = ''
-            data += struct_pack('B',record.percentage)
-            data += record.modPath
-            data += null1
-            data += struct_pack('B',record.flags)
-            out.packSub('DATA',data)
+        def pack_subrecord_data(self, record):
+            return b''.join(
+                [struct_pack(u'B', record.percentage), record.modPath, null1,
+                 struct_pack(u'B', record.flags)])
 
     melSet = MelSet(
         MelEdid(),
@@ -3043,8 +3040,8 @@ class MreWatr(MelRecord):
             else:
                 raise ModSizeError(ins.inName, readId, (186, 2), size_)
 
-        def dumpData(self,record,out):
-            out.packSub(self.subType,'H',record.damage)
+        def pack_subrecord_data(self, record):
+            return struct_pack(u'H', record.damage)
 
     class MelWatrDnam(MelTruncatedStruct):
         # TODO(inf) Why do we do this?

@@ -44,8 +44,8 @@ if brec.MelModel is None:
             'DMDL': ('DMDL', 'DMDT', 'DMDC', 'DMDS'),
         }
 
-        def __init__(self, attr='model', subType='MODL'):
-            types = self.__class__.typeSets[subType]
+        def __init__(self, attr='model', mel_sig='MODL'):
+            types = self.__class__.typeSets[mel_sig]
             MelGroup.__init__(
                 self, attr,
                 MelString(types[0], 'modPath'),

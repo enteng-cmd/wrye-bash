@@ -24,13 +24,12 @@
 from __future__ import division
 import os
 import struct
-from functools import partial
 
 from ._mergeability import is_esl_capable
 from .loot_parser import libloot_version, LOOTParser
 from .. import balt, bolt, bush, bass, load_order
 from ..bolt import GPath, deprint, sio, struct_pack, struct_unpack
-from ..brec import ModReader, MreRecord, RecordHeader
+from ..brec import ModReader, MreRecord, RecordHeader, SubrecordBlob, null1
 from ..cint import ObBaseRecord, ObCollection
 from ..exception import BoltError, CancelError, ModError
 
@@ -530,10 +529,7 @@ class ModCleaner(object):
                         insAtEnd = ins.atEnd
                         insTell = ins.tell
                         insUnpackRecHeader = ins.unpackRecHeader
-                        insUnpackSubHeader = ins.unpackSubHeader
-                        insRead = ins.read
-                        ins_unpack = partial(ins.unpack, __unpacker)
-                        headerSize = RecordHeader.rec_header_size
+                        ins_seek = ins.seek
                         while not insAtEnd():
                             subprogress(insTell())
                             header = insUnpackRecHeader()
@@ -543,7 +539,7 @@ class ModCleaner(object):
                                 groupType = header.groupType
                                 if groupType == 0 and header.label not in {'CELL','WRLD'}:
                                     # Skip Tops except for WRLD and CELL groups
-                                    insRead(hsize-headerSize)
+                                    header.skip_group(ins)
                                 elif detailed:
                                     if groupType == 1:
                                         # World Children
@@ -579,15 +575,15 @@ class ModCleaner(object):
                                 if doFog and rtype == 'CELL':
                                     nextRecord = insTell() + hsize
                                     while insTell() < nextRecord:
-                                        (nextType,nextSize) = insUnpackSubHeader()
-                                        if nextType != 'XCLL':
-                                            insRead(nextSize)
-                                        else:
-                                            color,near,far,rotXY,rotZ,fade,clip = ins_unpack(nextSize,'CELL.XCLL')
+                                        subrec = SubrecordBlob(ins, rtype, mel_sigs={b'XCLL'})
+                                        if subrec.mel_data is not None:
+                                            color, near, far, rotXY, rotZ, \
+                                            fade, clip = __unpacker(
+                                                subrec.mel_data)
                                             if not (near or far or clip):
                                                 fog.add(header.fid)
                                 else:
-                                    insRead(hsize)
+                                    ins_seek(hsize, 1)
                         if parents_to_scan:
                             # Detailed info - need to re-scan for CELL and WRLD infomation
                             ins.seek(0)
@@ -597,20 +593,19 @@ class ModCleaner(object):
                                 header = insUnpackRecHeader()
                                 rtype,hsize = header.recType,header.size
                                 if rtype == 'GRUP':
-                                    if header.groupType == 0 and header.label not in {'CELL','WRLD'}:
-                                        insRead(hsize-headerSize)
+                                    if header.is_top_group_header and header.label not in {'CELL','WRLD'}:
+                                        header.skip_group(ins)
                                 else:
                                     fid = header.fid
                                     if fid in parents_to_scan:
                                         record = MreRecord(header,ins,True)
-                                        record.loadSubrecords()
                                         eid = u''
-                                        for subrec in record.subrecords:
-                                            if subrec.subType == 'EDID':
-                                                eid = bolt.decoder(subrec.data)
-                                            elif subrec.subType == 'XCLC':
-                                                pos = struct_unpack(
-                                                    '=2i', subrec.data[:8])
+                                        for subrec in record.iterate_subrecords(mel_sigs={b'EDID', b'XCLC'}):
+                                            if subrec.mel_sig == b'EDID':
+                                                eid = bolt.decoder(subrec.mel_data)
+                                            elif subrec.mel_sig == b'XCLC':
+                                                pos = struct_unpack(u'=2i',
+                                                    subrec.mel_data[:8])
                                         for udrFid in parents_to_scan[fid]:
                                             if rtype == 'CELL':
                                                 udr[udrFid].parentEid = eid
@@ -620,7 +615,7 @@ class ModCleaner(object):
                                             elif rtype == 'WRLD':
                                                 udr[udrFid].parentParentEid = eid
                                     else:
-                                        insRead(hsize)
+                                        ins_seek(hsize, 1)
                     except CancelError:
                         raise
                     except:
@@ -647,13 +642,8 @@ class NvidiaFogFixer(object):
         path = self.modInfo.getPath()
         #--Scan/Edit
         with ModReader(self.modInfo.name,path.open('rb')) as ins:
-            ins_unpack = partial(ins.unpack, __unpacker)
             with path.temp.open('wb') as  out:
                 def copy(size):
-                    buff = ins.read(size)
-                    out.write(buff)
-                def copyPrev(size):
-                    ins.seek(-size,1)
                     buff = ins.read(size)
                     out.write(buff)
                 while not ins.atEnd():
@@ -661,7 +651,7 @@ class NvidiaFogFixer(object):
                     header = ins.unpackRecHeader()
                     type,size = header.recType,header.size
                     #(type,size,str0,fid,uint2) = ins.unpackRecHeader()
-                    copyPrev(RecordHeader.rec_header_size)
+                    out.write(header.pack_head())
                     if type == 'GRUP':
                         if header.groupType != 0: #--Ignore sub-groups
                             pass
@@ -671,17 +661,17 @@ class NvidiaFogFixer(object):
                     elif type == 'CELL':
                         nextRecord = ins.tell() + size
                         while ins.tell() < nextRecord:
-                            (type,size) = ins.unpackSubHeader()
-                            copyPrev(6)
-                            if type != 'XCLL':
-                                copy(size)
-                            else:
+                            subrec = SubrecordBlob(ins, type)
+                            if subrec.mel_sig == b'XCLL':
                                 color, near, far, rotXY, rotZ, fade, clip = \
-                                    ins_unpack(size, 'CELL.XCLL')
+                                    __unpacker(subrec.mel_data)
                                 if not (near or far or clip):
                                     near = 0.0001
+                                    subrec.mel_data = struct_pack(
+                                        u'=12s2f2l2f', color, near, far, rotXY,
+                                        rotZ, fade, clip)
                                     fixedCells.add(header.fid)
-                                out.write(struct_pack('=12s2f2l2f', color, near, far, rotXY, rotZ, fade,clip))
+                            subrec.packSub(out, subrec.mel_data)
                     #--Non-Cells
                     else:
                         copy(size)
@@ -737,9 +727,12 @@ class ModDetails(object):
                     nextRecord = ins.tell() + rec_siz
                     recs, endRecs = getRecordReader(header.flags1, rec_siz)
                     while recs.tell() < endRecs:
-                        (recType, rec_siz) = recs.unpackSubHeader()
-                        if recType == 'EDID':
-                            eid = recs.readString(rec_siz)
+                        subrec = SubrecordBlob(recs, recType, mel_sigs={u'EDID'})
+                        if subrec.mel_data is not None:
+                            # FIXME copied from readString
+                            eid = u'\n'.join(bolt.decoder(x, bolt.pluginEncoding,
+                                avoidEncodings=(u'utf8', u'utf-8')) for x
+                                in subrec.mel_data.rstrip(null1).split('\n'))
                             break
                         recs.seek(rec_siz, 1)
                     records.append((header.fid,eid))

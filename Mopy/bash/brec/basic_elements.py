@@ -27,9 +27,9 @@ higher-level building blocks can be found in common_subrecords.py."""
 from __future__ import division, print_function
 import struct
 
-from .utils_constants import FID, null1, _make_hashable
+from .utils_constants import FID, null1, _make_hashable, _int_unpacker
 from .. import bolt, exception
-from ..bolt import decoder, encode
+from ..bolt import decoder, encode, struct_pack
 
 #------------------------------------------------------------------------------
 class MelObject(object):
@@ -57,13 +57,88 @@ class MelObject(object):
                         u'%s: %r' % (obj_attr, getattr(self, obj_attr)))
         return u'<%s>' % u', '.join(sorted(to_show)) # is sorted() needed here?
 
-#------------------------------------------------------------------------------
-class MelBase(object):
-    """Represents a mod record raw element. Typically used for unknown elements.
-    Also used as parent class for other element types."""
+class Subrecord(object):
+    """A subrecord. Base class defines the subrecord format and packing."""
+    # Format used by sub-record headers. Morrowind uses a different one.
+    sub_header_fmt = u'=4sH'
+    # precompiled unpacker for sub-record headers
+    sub_header_unpack = struct.Struct(sub_header_fmt).unpack
+    # Size of sub-record headers. Morrowind has a different one.
+    sub_header_size = 6
+    __slots__ = (u'mel_sig',)
 
-    def __init__(self, subType, attr, default=None):
-        self.subType, self.attr, self.default = subType, attr, default
+    def packSub(self, out, binary_data):
+        # type: (file, bytes) -> None
+        """Write subrecord header and data to output stream.
+        Will automatically add a prefacing XXXX size subrecord to handle data
+        with size > 0xFFFF."""
+        try:
+            lenData = len(binary_data)
+            self._dump_bytes(out, binary_data, lenData)
+        except Exception:
+            bolt.deprint(u'%r: Failed packing: %s, %s' % (
+                self, self.mel_sig, binary_data))
+            raise
+
+    def _dump_bytes(self, out, binary_data, lenData):
+        outWrite = out.write
+        if lenData > 0xFFFF:
+            outWrite(struct_pack(u'=4sHI', b'XXXX', 4, lenData))
+            lenData = 0
+        outWrite(struct_pack(MelBase.sub_header_fmt, self.mel_sig, lenData))
+        outWrite(binary_data)
+
+def unpackSubHeader(ins, recType='----', expType=None, expSize=0,
+                    __unpacker=_int_unpacker, __sr=Subrecord):
+    """Unpack a subrecord header. Optionally checks for match with expected
+    type and size."""
+    ins_unpack = ins.unpack
+    (mel_type, size) = ins_unpack(__sr.sub_header_unpack, __sr.sub_header_size,
+                                  recType + '.SUB_HEAD')
+    #--Extended storage?
+    while mel_type == 'XXXX':
+        size = ins_unpack(__unpacker, 4, recType + '.XXXX.SIZE.')[0]
+        # Throw away size here (always == 0)
+        mel_type = ins_unpack(__sr.sub_header_unpack, __sr.sub_header_size,
+                              recType + '.XXXX.TYPE')[0]
+    #--Match expected name?
+    if expType and expType != mel_type:
+        raise exception.ModError(ins.inName, u'%s: Expected %s subrecord, '
+            u'but found %s instead.' % (recType, expType, mel_type))
+    #--Match expected size?
+    if expSize and expSize != size:
+        raise exception.ModSizeError(ins.inName, recType + '.' + mel_type,
+                                     (expSize,), size)
+    return mel_type,size
+
+class SubrecordBlob(Subrecord):
+    """Basic implementation that reads all data without unpacking, adapted to
+    current usages."""
+    __slots__ = (u'mel_data',)
+
+    def __init__(self, ins, record_sig, mel_sigs=frozenset()):
+        # record_sig is the sig of parent record
+        mel_sig, mel_size = unpackSubHeader(ins)
+        self.mel_sig = mel_sig
+        if not mel_sigs or mel_sig in mel_sigs:
+            self.mel_data = ins.read(mel_size, record_sig + self.mel_sig)
+        else:
+            self.mel_data = None
+            ins.seek(mel_size, 1) # discard the data
+
+#------------------------------------------------------------------------------
+class MelBase(Subrecord):
+    """Represents a mod record element which can be a subrecord or a field.
+    Instances of this class are actually parasitic organisms that need a record
+    to go live. They do not hold any data themselves, they instead use the
+    loadData API to set host record attributes (from an input stream) and
+    dumpData to dump those attributes (to an output stream). All the complexity
+    of subrecords unpacking should be encapsulated here. The base class is
+    typically used for unknown elements."""
+    __slots__ = (u'attr', u'default')
+
+    def __init__(self, mel_sig, attr, default=None):
+        self.mel_sig, self.attr, self.default = mel_sig, attr, default
 
     def getSlotsUsed(self):
         return self.attr,
@@ -112,7 +187,7 @@ class MelBase(object):
 
     def getLoaders(self,loaders):
         """Adds self as loader for type."""
-        loaders[self.subType] = self
+        loaders[self.mel_sig] = self
 
     def hasFids(self,formElements):
         """Include self if has fids."""
@@ -128,8 +203,15 @@ class MelBase(object):
 
     def dumpData(self,record,out):
         """Dumps data from record to outstream."""
-        value = record.__getattribute__(self.attr)
-        if value is not None: out.packSub(self.subType,value)
+        value = self.pack_subrecord_data(record)
+        if value is not None: self.packSub(out, value)
+
+    def pack_subrecord_data(self, record):
+        """Get the subrecord data stored in record and pack them to a bytes
+        string ready to write to an output stream. In some cases another type
+        is returned that must be packed by caller (see MelString).
+        :rtype: basestring | None"""
+        return record.__getattribute__(self.attr) # this better be bytes here
 
     def mapFids(self,record,function,save=False):
         """Applies function to fids. If save is True, then fid is set
@@ -143,7 +225,7 @@ class MelBase(object):
         one, but groups and unions return multiple here.
 
         :rtype: set[str]"""
-        return {self.subType}
+        return {self.mel_sig}
 
     @property
     def static_size(self):
@@ -179,7 +261,7 @@ class MelCounter(MelBase):
         return self.element.getSlotsUsed()
 
     def getLoaders(self, loaders):
-        loaders[self.element.subType] = self
+        loaders[self.element.mel_sig] = self
 
     def setDefault(self, record):
         self.element.setDefault(record)
@@ -229,36 +311,6 @@ class MelPartialCounter(MelCounter):
         self.element.dumpData(record, out)
 
 #------------------------------------------------------------------------------
-class MelFid(MelBase):
-    """Represents a mod record fid element."""
-
-    def hasFids(self,formElements):
-        formElements.add(self)
-
-    def loadData(self, record, ins, sub_type, size_, readId):
-        record.__setattr__(self.attr,ins.unpackRef())
-
-    def dumpData(self,record,out):
-        try:
-            value = record.__getattribute__(self.attr)
-        except AttributeError:
-            value = None
-        if value is not None: out.packRef(self.subType,value)
-
-    def mapFids(self,record,function,save=False):
-        attr = self.attr
-        try:
-            fid = record.__getattribute__(attr)
-        except AttributeError:
-            fid = None
-        result = function(fid)
-        if save: record.__setattr__(attr,result)
-
-    @property
-    def static_size(self):
-        return 4 # Always a uint32
-
-#------------------------------------------------------------------------------
 # TODO(inf) DEPRECATED! - don't use for new usages -> MelGroups(MelFid)
 #  instead. Same idea as with MelFidList.
 class MelFids(MelBase):
@@ -275,10 +327,8 @@ class MelFids(MelBase):
         record.__getattribute__(self.attr).append(fid)
 
     def dumpData(self,record,out):
-        type = self.subType
-        outPackRef = out.packRef
         for fid in record.__getattribute__(self.attr):
-            outPackRef(type,fid)
+            MelFid(self.mel_sig, '').packSub(out, struct_pack(u'=I', fid))
 
     def mapFids(self,record,function,save=False):
         fids = record.__getattribute__(self.attr)
@@ -291,8 +341,8 @@ class MelNull(MelBase):
     """Represents an obsolete record. Reads bytes from instream, but then
     discards them and is otherwise inactive."""
 
-    def __init__(self, subType):
-        self.subType = subType
+    def __init__(self, mel_sig):
+        self.mel_sig = mel_sig
 
     def getSlotsUsed(self):
         return ()
@@ -320,10 +370,10 @@ class MelFidList(MelFids):
                           readId)
         record.__setattr__(self.attr,list(fids))
 
-    def dumpData(self,record,out):
+    def pack_subrecord_data(self, record):
         fids = record.__getattribute__(self.attr)
-        if not fids: return
-        out.packSub(self.subType,repr(len(fids))+'I',*fids)
+        if not fids: return None
+        return struct_pack(u'%dI' % len(fids), *fids)
 
 #------------------------------------------------------------------------------
 class MelSequential(MelBase):
@@ -472,37 +522,43 @@ class MelGroups(MelGroup):
 class MelString(MelBase):
     """Represents a mod record string element."""
 
-    def __init__(self, subType, attr, default=None, maxSize=0):
-        MelBase.__init__(self, subType, attr, default)
+    def __init__(self, mel_sig, attr, default=None, maxSize=0):
+        MelBase.__init__(self, mel_sig, attr, default)
         self.maxSize = maxSize
+        self.encoding = None # will default to bolt.pluginEncoding
 
     def loadData(self, record, ins, sub_type, size_, readId):
         value = ins.readString(size_, readId)
         record.__setattr__(self.attr,value)
 
-    def dumpData(self,record,out):
-        string_val = record.__getattribute__(self.attr)
-        if string_val is not None:
-            out.write_string(self.subType, string_val, max_size=self.maxSize)
+    def packSub(self, out, string_val):
+        # type: (file, unicode) -> None
+        """Writes out a string subrecord, properly encoding it beforehand and
+        respecting max_size, min_size and preferred_encoding if they are
+        set."""
+        byte_string = bolt.encode_complex_string(string_val, self.maxSize, 0,
+                                                 self.encoding)
+        # len of data will be recalculated in MelString._dump_bytes
+        super(MelString, self).packSub(out, byte_string)
+
+    def _dump_bytes(self, out, byte_string, lenData):
+        """Write a properly encoded string with a null terminator."""
+        super(MelString, self)._dump_bytes(out, byte_string,
+            lenData + 1) # add the len of null terminator
+        out.write(null1) # then write it out
 
 #------------------------------------------------------------------------------
 class MelUnicode(MelString):
     """Like MelString, but instead of using bolt.pluginEncoding to read the
        string, it tries the encoding specified in the constructor instead"""
-    def __init__(self, subType, attr, default=None, maxSize=0, encoding=None):
-        MelString.__init__(self, subType, attr, default, maxSize)
+    def __init__(self, mel_sig, attr, default=None, maxSize=0, encoding=None):
+        MelString.__init__(self, mel_sig, attr, default, maxSize)
         self.encoding = encoding # None == automatic detection
 
     def loadData(self, record, ins, sub_type, size_, readId):
         value = u'\n'.join(decoder(x,self.encoding,avoidEncodings=('utf8','utf-8'))
                            for x in bolt.cstrip(ins.read(size_, readId)).split('\n'))
         record.__setattr__(self.attr,value)
-
-    def dumpData(self,record,out):
-        string_val = record.__getattribute__(self.attr)
-        if string_val is not None:
-            out.write_string(self.subType, string_val, max_size=self.maxSize,
-                             preferred_encoding=self.encoding)
 
 #------------------------------------------------------------------------------
 class MelLString(MelString):
@@ -525,19 +581,25 @@ class MelStrings(MelString):
         value = ins.readStrings(size_, readId)
         record.__setattr__(self.attr,value)
 
-    def dumpData(self,record,out):
-        strings = record.__getattribute__(self.attr)
-        if strings:
-            out.packSub0(self.subType,null1.join(encode(x,firstEncoding=bolt.pluginEncoding) for x in strings)+null1)
+    def packSub(self, out, strings):
+        """Writes out a strings array subrecord, encoding and adding a null
+        terminator to each string separately ."""
+        data = null1.join( # TODO use encode_complex_string?
+            encode(x, firstEncoding=bolt.pluginEncoding) for x in strings)
+        super(MelString, self).packSub(out, data) # call *MelBase* packSub
 
 #------------------------------------------------------------------------------
 class MelStruct(MelBase):
     """Represents a structure record."""
 
-    def __init__(self, subType, struct_format, *elements):
-        self.subType, self.struct_format = subType, struct_format
-        self.attrs,self.defaults,self.actions,self.formAttrs = MelBase.parseElements(*elements)
-        self._unpacker = struct.Struct(self.struct_format).unpack
+    def __init__(self, mel_sig, struct_format, *elements):
+        self.mel_sig = mel_sig
+        self.attrs, self.defaults, self.actions, self.formAttrs = \
+            self.__class__.parseElements(*elements)
+        _struct = struct.Struct(struct_format)
+        self._unpacker = _struct.unpack
+        self._packer = _struct.pack
+        self._static_size = _struct.size
 
     def getSlotsUsed(self):
         return self.attrs
@@ -555,18 +617,12 @@ class MelStruct(MelBase):
         unpacked = ins.unpack(self._unpacker, size_, readId)
         setter = record.__setattr__
         for attr,value,action in zip(self.attrs,unpacked,self.actions):
-            if action: value = action(value)
-            setter(attr, value)
+            setter(attr, action(value) if action else value)
 
-    def dumpData(self,record,out):
-        values = []
-        valuesAppend = values.append
-        getter = record.__getattribute__
-        for attr,action in zip(self.attrs,self.actions):
-            value = getter(attr)
-            if action: value = value.dump()
-            valuesAppend(value)
-        out.packSub(self.subType, self.struct_format, *values)
+    def pack_subrecord_data(self, record):
+        values = [value.dump() if action else value for value, action in
+                  zip(map(record.__getattribute__, self.attrs), self.actions)]
+        return self._packer(*values)
 
     def mapFids(self,record,function,save=False):
         getter = record.__getattribute__
@@ -577,71 +633,87 @@ class MelStruct(MelBase):
 
     @property
     def static_size(self):
-        return struct.calcsize(self.struct_format)
+        return self._static_size
+
+# Simple primitive type wrappers ----------------------------------------------
+def _get_structs(struct_format):
+    _struct = struct.Struct(struct_format)
+    return _struct.unpack, _struct.pack, _struct.size
+
+class _MelField(MelStruct):
+    """A simple static subrecord - no actions and a static unpacker."""
+    _unpacker, _packer, static_size = _get_structs(u'I')
+
+    def __init__(self, mel_sig, element):
+        self.mel_sig = mel_sig
+        self.attrs, self.defaults, self.actions, self.formAttrs = \
+             MelStruct.parseElements(element)
+        self.attr = self.attrs[0]
+
+    def loadData(self, record, ins, sub_type, size_, readId):
+        record.__setattr__(self.attr,
+                           ins.unpack(self._unpacker, size_, readId)[0])
+
+    def pack_subrecord_data(self, record):
+        return self._packer(record.__getattribute__(self.attr))
+
+class MelFloat(_MelField):
+    """Float."""
+    _unpacker, _packer, static_size = _get_structs(u'=f')
+
+class MelSInt8(_MelField):
+    """Signed 8-bit integer."""
+    _unpacker, _packer, static_size = _get_structs(u'=b')
+
+class MelSInt16(_MelField):
+    """Signed 16-bit integer."""
+    _unpacker, _packer, static_size = _get_structs(u'=h')
+
+class MelSInt32(_MelField):
+    """Signed 32-bit integer."""
+    _unpacker, _packer, static_size = _get_structs(u'=i')
+
+class MelUInt8(_MelField):
+    """Unsigned 8-bit integer."""
+    _unpacker, _packer, static_size = _get_structs(u'=B')
+
+class MelUInt16(_MelField):
+    """Unsigned 16-bit integer."""
+    _unpacker, _packer, static_size = _get_structs(u'=H')
+
+class MelUInt32(_MelField):
+    """Unsigned 32-bit integer."""
+    _unpacker, _packer, static_size = _get_structs(u'=I')
 
 #------------------------------------------------------------------------------
-# Simple primitive type wrappers
-class _MelSimpleStruct(MelStruct):
-    """Wrapper around MelStruct to avoid having to constantly specify the
-    format."""
-    # defaults = actions = formAttrs = (0,)
+class MelFid(MelUInt32):
+    """Represents a mod record fid element."""
 
-    def __init__(self, signature, element):
-        self.subType = signature
-        # if isinstance(element, tuple):
-        self.attrs, self.defaults, self.actions, self.formAttrs = \
-             MelBase.parseElements(element)
-        # else: # XXX broken
-        #     self.attrs = (element,)
+    def hasFids(self,formElements):
+        formElements.add(self)
 
-class MelFloat(_MelSimpleStruct):
-    """Float."""
-    struct_format = u'=f'
-    _unpacker = struct.Struct(struct_format).unpack
-    static_size = struct.calcsize(struct_format)
+    def pack_subrecord_data(self,record):
+        try:
+            return super(MelFid, self).pack_subrecord_data( # pack an u'=I'
+                record.__getattribute__(self.attr))
+        except AttributeError:
+            return None
 
-class MelSInt8(_MelSimpleStruct):
-    """Signed 8-bit integer."""
-    struct_format = u'=b'
-    _unpacker = struct.Struct(struct_format).unpack
-    static_size = struct.calcsize(struct_format)
-
-class MelSInt16(_MelSimpleStruct):
-    """Signed 16-bit integer."""
-    struct_format = u'=h'
-    _unpacker = struct.Struct(struct_format).unpack
-    static_size = struct.calcsize(struct_format)
-
-class MelSInt32(_MelSimpleStruct):
-    """Signed 32-bit integer."""
-    struct_format = u'=i'
-    _unpacker = struct.Struct(struct_format).unpack
-    static_size = struct.calcsize(struct_format)
-
-class MelUInt8(_MelSimpleStruct):
-    """Unsigned 8-bit integer."""
-    struct_format = u'=B'
-    _unpacker = struct.Struct(struct_format).unpack
-    static_size = struct.calcsize(struct_format)
-
-class MelUInt16(_MelSimpleStruct):
-    """Unsigned 16-bit integer."""
-    struct_format = u'=H'
-    _unpacker = struct.Struct(struct_format).unpack
-    static_size = struct.calcsize(struct_format)
-
-class MelUInt32(_MelSimpleStruct):
-    """Unsigned 32-bit integer."""
-    struct_format = u'=I'
-    _unpacker = struct.Struct(struct_format).unpack
-    static_size = struct.calcsize(struct_format)
+    def mapFids(self,record,function,save=False):
+        attr = self.attr
+        try:
+            fid = record.__getattribute__(attr)
+        except AttributeError:
+            fid = None
+        result = function(fid)
+        if save: record.__setattr__(attr,result)
 
 #------------------------------------------------------------------------------
 class MelOptStruct(MelStruct):
     """Represents an optional structure that is only dumped if at least one
     value is not equal to the default."""
 
-    def dumpData(self, record, out):
+    def pack_subrecord_data(self, record):
         # TODO: Unfortunately, checking if the attribute is None is not
         # really effective.  Checking it to be 0,empty,etc isn't effective either.
         # It really just needs to check it against the default.
@@ -649,8 +721,8 @@ class MelOptStruct(MelStruct):
         for attr,default in zip(self.attrs,self.defaults):
             oldValue = recordGetAttr(attr)
             if oldValue is not None and oldValue != default:
-                MelStruct.dumpData(self, record, out)
-                break
+                return super(MelOptStruct, self).pack_subrecord_data(record)
+        return None
 
 #------------------------------------------------------------------------------
 # 'Opt' versions of the type wrappers above
@@ -680,7 +752,7 @@ class MelOptUInt32(MelUInt32, MelOptStruct):
 class MelOptFid(MelOptUInt32):
     """Optional FormID. Wrapper around MelOptUInt32 to avoid having to
     constantly specify the format."""
-    def __init__(self, signature, attr):
-        """:type signature: str
-        :type attr: str"""
-        MelOptUInt32.__init__(self, signature, (FID, attr))
+    def __init__(self, mel_sig, attr):
+        """:type mel_sig: bytes
+        :type attr: basestring"""
+        MelOptUInt32.__init__(self, mel_sig, (FID, attr))

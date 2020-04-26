@@ -30,7 +30,7 @@ from itertools import chain
 from operator import itemgetter, attrgetter
 # Wrye Bash imports
 from .brec import ModReader, RecordHeader, GrupHeader, TopGrupHeader, MreRecord
-from .bolt import GPath, sio
+from .bolt import GPath, sio, struct_pack
 from . import bush # for fallout3/nv fsName
 from .exception import AbstractError, ArgumentError, ModError
 
@@ -412,7 +412,7 @@ class MobDials(MobObjects):
                             recordLoadInfos(ins, ins.tell() + size - hsize,
                                             infoClass)
                         else:
-                            ins.seek(ins.tell() + size - hsize)
+                            header.skip_group(ins)
                     except AttributeError:
                         raise ModError(self.inName, u'Malformed Plugin: '
                             u'Exterior CELL subblock before worldspace GRUP')
@@ -1346,7 +1346,7 @@ class MobWorlds(MobBase):
             totalSize = RecordHeader.rec_header_size + sum(
                 x.dump(out) for x in self.worldBlocks)
             out.seek(worldHeaderPos + 4)
-            out.pack(u'I', totalSize)
+            out.write(struct_pack(u'I', totalSize))
             out.seek(worldHeaderPos + totalSize)
 
     def getNumRecords(self,includeGroups=True):
