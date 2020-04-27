@@ -25,7 +25,7 @@
 and subrecords used for the saves - see MorrowindSaveHeader for more
 information."""
 from ... import bolt
-from ...bolt import cstrip, decode
+from ...bolt import cstrip, decoder
 from ...brec import MelBase, MelSet, MelString, MelStruct, MelArray, \
     MreHeaderBase, MelUnion, SaveDecider, MelNull, MelSequential
 
@@ -33,7 +33,7 @@ from ...brec import MelBase, MelSet, MelString, MelStruct, MelArray, \
 def _decode_raw(target_str):
     """Adapted from MelUnicode.loadData. ##: maybe move to bolt/brec?"""
     return u'\n'.join(
-        decode(x, avoidEncodings=(u'utf8', u'utf-8')) for x
+        decoder(x, avoidEncodings=(u'utf8', u'utf-8')) for x
         in cstrip(target_str).split(b'\n'))
 
 class MelSavesOnly(MelSequential):

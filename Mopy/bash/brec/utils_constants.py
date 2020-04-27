@@ -27,7 +27,7 @@ almost all other parts of brec."""
 from __future__ import division, print_function
 import struct
 
-from ..bolt import decode, struct_pack, struct_unpack
+from ..bolt import decoder, struct_pack, struct_unpack
 # no local imports, imported everywhere in brec
 
 # Random stuff ----------------------------------------------------------------
@@ -43,7 +43,7 @@ def _coerce(value, newtype, base=None, AllowNone=False):
                 return retValue not in (u'',u'none',u'false',u'no',u'0',u'0.0')
             else: return bool(value)
         elif base: retValue = newtype(value, base)
-        elif newtype is unicode: retValue = decode(value)
+        elif newtype is unicode: retValue = decoder(value)
         else: retValue = newtype(value)
         if (AllowNone and
             (isinstance(retValue,str) and retValue.lower() == 'none') or
