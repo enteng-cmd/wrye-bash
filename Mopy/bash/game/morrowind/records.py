@@ -31,7 +31,7 @@ from ...brec import MelBase, MelSet, MelString, MelStruct, MelArray, \
 
 # Utilities
 def _decode_raw(target_str):
-    """Adapted from MelUnicode.loadData. ##: maybe move to bolt/brec?"""
+    """Adapted from MelUnicode.load_data. ##: maybe move to bolt/brec?"""
     return u'\n'.join(
         decoder(x, avoidEncodings=(u'utf8', u'utf-8')) for x
         in cstrip(target_str).split(b'\n'))
@@ -59,9 +59,9 @@ class MreTes3(MreHeaderBase):
         """Wrapper around MelStruct to handle the author and description
         fields, which are padded to 32 and 256 bytes, respectively, with null
         bytes."""
-        def loadData(self, record, ins, sub_type, size_, readId):
-            super(MreTes3.MelTes3Hedr, self).loadData(record, ins, sub_type,
-                                                      size_, readId)
+        def load_data(self, record, ins, sub_type, size_, readId):
+            super(MreTes3.MelTes3Hedr, self).load_data(record, ins, sub_type,
+                                                       size_, readId)
             # Strip off the null bytes and convert to unicode
             record.author = _decode_raw(record.author)
             record.description = _decode_raw(record.description)

@@ -104,9 +104,9 @@ class MelBipedObjectData(MelStruct):
         loaders['BOD2'] = self
         loaders['BODT'] = self
 
-    def loadData(self, record, ins, sub_type, size_, readId,
-                 __unpacker2=struct.Struct(u'2I').unpack,
-                 __unpacker3=struct.Struct(u'3I').unpack):
+    def load_data(self, record, ins, sub_type, size_, readId,
+                  __unpacker2=struct.Struct(u'2I').unpack,
+                  __unpacker3=struct.Struct(u'3I').unpack):
         if sub_type == 'BODT':
             # Old record type, use alternate loading routine
             if size_ == 8:
@@ -126,7 +126,7 @@ class MelBipedObjectData(MelStruct):
             setter('armorFlags',MelBipedObjectData.ArmorTypeFlags(armorFlags))
         else:
             # BOD2 - new style, MelStruct can handle it
-            MelStruct.loadData(self, record, ins, sub_type, size_, readId)
+            MelStruct.load_data(self, record, ins, sub_type, size_, readId)
 
 #------------------------------------------------------------------------------
 class MelAttackData(MelStruct):
@@ -1130,8 +1130,8 @@ class MelVmad(MelBase):
             self._handler_map[record_sig] = special_handler = special_handler()
         return special_handler
 
-    def loadData(self, record, ins, sub_type, size_, readId,
-                      __unpacker=struct.Struct(u'=hhH').unpack):
+    def load_data(self, record, ins, sub_type, size_, readId,
+                  __unpacker=struct.Struct(u'=hhH').unpack):
         # Remember where this VMAD subrecord ends
         end_of_vmad = ins.tell() + size_
         if self._vmad_class is None:
@@ -1970,7 +1970,7 @@ class MreDebr(MelRecord):
             MelStruct.__init__(self, 'DATA', '', ('percentage', 0),
                                ('modPath', null1), ('flags', 0))
 
-        def loadData(self, record, ins, sub_type, size_, readId):
+        def load_data(self, record, ins, sub_type, size_, readId):
             """Reads data from ins into record attribute."""
             byte_data = ins.read(size_, readId)
             (record.percentage,) = struct_unpack('B',byte_data[0:1])
@@ -2067,11 +2067,11 @@ class MreDobj(MelRecord):
                 MelStruct('DNAM', '2I', 'objectUse', (FID, 'objectID')),
             )
 
-        def loadData(self, record, ins, sub_type, size_, readId):
+        def load_data(self, record, ins, sub_type, size_, readId):
             # Load everything but the noise
             start_pos = ins.tell()
-            super(MreDobj.MelDobjDnam, self).loadData(record, ins, sub_type,
-                                                      size_, readId)
+            super(MreDobj.MelDobjDnam, self).load_data(record, ins, sub_type,
+                                                       size_, readId)
             # Now, read the remainder of the subrecord and store it
             read_size = ins.tell() - start_pos
             record.unknownDNAM = ins.read(size_ - read_size)
@@ -3026,10 +3026,10 @@ class MreLgtm(MelRecord):
     class MelLgtmData(MelStruct):
         """Older format skips 8 bytes in the middle and has the same unpacked
         length, so we can't use MelTruncatedStruct."""
-        def loadData(self, record, ins, sub_type, size_, readId,
-            __unpacker=struct.Struct(u'3Bs3Bs3Bs2f2i3f24s3Bs3f4s').unpack):
+        def load_data(self, record, ins, sub_type, size_, readId,
+                      __unpacker=struct.Struct(u'3Bs3Bs3Bs2f2i3f24s3Bs3f4s').unpack):
             if size_ == 92:
-                MelStruct.loadData(self, record, ins, sub_type, size_, readId)
+                MelStruct.load_data(self, record, ins, sub_type, size_, readId)
                 return
             elif size_ == 84:
                 unpacked_val = ins.unpack(__unpacker, size_, readId)

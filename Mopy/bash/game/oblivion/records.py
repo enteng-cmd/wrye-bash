@@ -98,7 +98,7 @@ class MelObmeScitGroup(MelGroup):
     for another part of the code that's suffering from this). And we can't
     simply not put this in a group, because a bunch of code relies on a group
     called 'scriptEffect' existing..."""
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         target = record.__getattribute__(self.attr)
         if target is None:
             class _MelHackyObject(MelObject):
@@ -114,7 +114,7 @@ class MelObmeScitGroup(MelGroup):
             target.__slots__ = [s for element in self.elements for s in
                                 element.getSlotsUsed()]
             record.__setattr__(self.attr,target)
-        self.loaders[sub_type].loadData(target, ins, sub_type, size_, readId)
+        self.loaders[sub_type].load_data(target, ins, sub_type, size_, readId)
 
 ##: Should we allow mixing regular effects and OBME ones? This implementation
 # assumes no, but xEdit's is broken right now, so...
@@ -218,7 +218,7 @@ class MelEffects(MelSequential):
         self._vanilla_form_elements = set()
         self._obme_loaders = {}
         self._obme_form_elements = set()
-        # Only for setting the possible signatures, redirected in loadData etc.
+        # Only for setting the possible signatures, redirected in load_data etc.
         super(MelEffects, self).__init__(*(self._vanilla_elements +
                                            self._obme_elements))
 
@@ -230,7 +230,7 @@ class MelEffects(MelSequential):
 
     def getLoaders(self, loaders):
         # We need to collect all signatures and assign ourselves for them all
-        # to always gain control of loadData so we can redirect it properly
+        # to always gain control of load_data so we can redirect it properly
         for element in self._vanilla_elements:
             element.getLoaders(self._vanilla_loaders)
         for element in self._obme_elements:
@@ -247,11 +247,11 @@ class MelEffects(MelSequential):
         if self._vanilla_form_elements or self._obme_form_elements:
             formElements.add(self)
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         target_loaders = (self._obme_loaders
                           if record.obme_record_version is not None
                           else self._vanilla_loaders)
-        target_loaders[sub_type].loadData(record, ins, sub_type, size_, readId)
+        target_loaders[sub_type].load_data(record, ins, sub_type, size_, readId)
 
     def dumpData(self, record, out):
         target_elements = (self._obme_elements
@@ -303,8 +303,8 @@ class MreLeveledList(MreLeveledListBase):
         def __init__(self):
             MelUInt8.__init__(self, 'LVLD', 'chanceNone')
 
-        def loadData(self, record, ins, sub_type, size_, readId):
-            MelUInt8.loadData(self, record, ins, sub_type, size_, readId)
+        def load_data(self, record, ins, sub_type, size_, readId):
+            MelUInt8.load_data(self, record, ins, sub_type, size_, readId)
             if record.chanceNone > 127:
                 record.flags.calcFromAllLevels = True
                 record.chanceNone &= 127
@@ -1483,7 +1483,7 @@ class MrePack(MelRecord):
 ##    rec_sig = b'PGRD'
 ##    class MelPgrl(MelStructs):
 ##        """Handler for pathgrid pgrl record."""
-##        def loadData(self,record,ins,type,size,readId):
+##        def load_data(self,record,ins,type,size,readId):
 ##            if(size % 4 != 0):
 ##                raise ModError(
 ##                    ins.inName, u'%s: Expected subrecord of size divisible '

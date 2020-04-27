@@ -61,8 +61,8 @@ class MreHeaderBase(MelRecord):
             record.masters = []
             record.master_sizes = []
 
-        def loadData(self, record, ins, sub_type, size_, readId,
-                     __unpacker=struct.Struct(u'Q').unpack):
+        def load_data(self, record, ins, sub_type, size_, readId,
+                      __unpacker=struct.Struct(u'Q').unpack):
             if sub_type == b'MAST':
                 # Don't use ins.readString, because it will try to use
                 # bolt.pluginEncoding for the filename. This is one case where

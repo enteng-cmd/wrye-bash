@@ -186,8 +186,8 @@ class MreLeveledList(MreLeveledListBase):
 
     class MelLevListLvld(MelStruct):
         """Subclass to support alternate format."""
-        def loadData(self, record, ins, sub_type, size_, readId):
-            MelStruct.loadData(self, record, ins, sub_type, size_, readId)
+        def load_data(self, record, ins, sub_type, size_, readId):
+            MelStruct.load_data(self, record, ins, sub_type, size_, readId)
             if record.chanceNone > 127:
                 record.flags.calcFromAllLevels = True
                 record.chanceNone &= 127
@@ -1000,7 +1000,7 @@ class MreDebr(MelRecord):
             MelStruct.__init__(self, 'DATA', '', ('percentage', 0),
                                ('modPath', null1), ('flags', 0))
 
-        def loadData(self, record, ins, sub_type, size_, readId):
+        def load_data(self, record, ins, sub_type, size_, readId):
             byte_data = ins.read(size_, readId)
             (record.percentage,) = struct_unpack(u'B',byte_data[0:1])
             record.modPath = byte_data[1:-2]
@@ -3029,10 +3029,10 @@ class MreWatr(MelRecord):
     # TODO(inf) Actually two separate DATA subrecords - union + distributor
     class MelWatrData(MelStruct):
         """Handle older truncated DATA for WATR subrecord."""
-        def loadData(self, record, ins, sub_type, size_, readId,
-                     __unpacker=struct.Struct(u'H').unpack):
+        def load_data(self, record, ins, sub_type, size_, readId,
+                      __unpacker=struct.Struct(u'H').unpack):
             if size_ == 186:
-                MelStruct.loadData(self, record, ins, sub_type, size_, readId)
+                MelStruct.load_data(self, record, ins, sub_type, size_, readId)
                 return
             elif size_ == 2:
                 (record.damage,) = ins.unpack(__unpacker, size_, readId)

@@ -199,7 +199,7 @@ class MelBase(Subrecord):
         """Sets default value for record instance."""
         record.__setattr__(self.attr,self.default)
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         """Reads data from ins into record attribute."""
         record.__setattr__(self.attr, ins.read(size_, readId))
 
@@ -262,7 +262,7 @@ class _MelField(MelBase):
         record.__setattr__(self.attr,
             self.action(self.default) if self.action else self.default)
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         value, = ins.unpack(self._unpacker, size_, readId)
         record.__setattr__(self.attr,
             self.action(value) if self.action else value)
@@ -306,8 +306,8 @@ class MelCounter(MelBase):
     def setDefault(self, record):
         self.element.setDefault(record)
 
-    def loadData(self, record, ins, sub_type, size_, readId):
-        self.element.loadData(record, ins, sub_type, size_, readId)
+    def load_data(self, record, ins, sub_type, size_, readId):
+        self.element.load_data(record, ins, sub_type, size_, readId)
 
     def dumpData(self, record, out):
         # Count the counted type first, then check if we should even dump
@@ -362,7 +362,7 @@ class MelFids(MelBase):
     def setDefault(self,record):
         record.__setattr__(self.attr,[])
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         fid = ins.unpackRef()
         record.__getattribute__(self.attr).append(fid)
 
@@ -390,7 +390,7 @@ class MelNull(MelBase):
     def setDefault(self,record):
         pass
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         ins.seek(size_, 1, readId)
 
     def dumpData(self,record,out):
@@ -404,7 +404,7 @@ class MelFidList(MelFids):
     MelFids is how the data is stored. For MelFidList, the data is stored
     as a single subrecord rather than as separate subrecords."""
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         if not size_: return
         fids = ins.unpack(struct.Struct(u'%dI' % (size_ // 4)).unpack, size_,
                           readId)
@@ -499,14 +499,14 @@ class MelGroup(MelSequential):
             element.setDefault(target)
         return target
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         target = record.__getattribute__(self.attr)
         if target is None:
             target = self.getDefault()
             target.__slots__ = [s for element in self.elements for s in
                                 element.getSlotsUsed()]
             record.__setattr__(self.attr,target)
-        self.loaders[sub_type].loadData(target, ins, sub_type, size_, readId)
+        self.loaders[sub_type].load_data(target, ins, sub_type, size_, readId)
 
     def dumpData(self,record,out):
         target = record.__getattribute__(self.attr)
@@ -530,7 +530,7 @@ class MelGroups(MelGroup):
     def setDefault(self,record):
         record.__setattr__(self.attr,[])
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         if sub_type in self._init_sigs:
             # We've hit one of the initial signatures, make a new object
             target = self.getDefault()
@@ -540,7 +540,7 @@ class MelGroups(MelGroup):
         else:
             # Add to the existing element
             target = record.__getattribute__(self.attr)[-1]
-        self.loaders[sub_type].loadData(target, ins, sub_type, size_, readId)
+        self.loaders[sub_type].load_data(target, ins, sub_type, size_, readId)
 
     def dumpData(self,record,out):
         elements = self.elements
@@ -567,7 +567,7 @@ class MelString(MelBase):
         self.maxSize = maxSize
         self.encoding = None # will default to bolt.pluginEncoding
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         value = ins.readString(size_, readId)
         record.__setattr__(self.attr,value)
 
@@ -595,7 +595,7 @@ class MelUnicode(MelString):
         MelString.__init__(self, mel_sig, attr, default, maxSize)
         self.encoding = encoding # None == automatic detection
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         value = u'\n'.join(decoder(x,self.encoding,avoidEncodings=('utf8','utf-8'))
                            for x in bolt.cstrip(ins.read(size_, readId)).split('\n'))
         record.__setattr__(self.attr,value)
@@ -603,7 +603,7 @@ class MelUnicode(MelString):
 #------------------------------------------------------------------------------
 class MelLString(MelString):
     """Represents a mod record localized string."""
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         value = ins.readLString(size_, readId)
         record.__setattr__(self.attr,value)
 
@@ -617,7 +617,7 @@ class MelStrings(MelString):
     def getDefault(self):
         return []
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         value = ins.readStrings(size_, readId)
         record.__setattr__(self.attr,value)
 
@@ -653,7 +653,7 @@ class MelStruct(MelBase):
             if action: value = action(value)
             setter(attr,value)
 
-    def loadData(self, record, ins, sub_type, size_, readId):
+    def load_data(self, record, ins, sub_type, size_, readId):
         unpacked = ins.unpack(self._unpacker, size_, readId)
         setter = record.__setattr__
         for attr,value,action in zip(self.attrs,unpacked,self.actions):
