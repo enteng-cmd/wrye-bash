@@ -28,7 +28,7 @@ from collections import OrderedDict
 
 from .. import bass, balt, bosh, bolt, load_order
 from ..balt import bell, Link, Resources
-from ..bolt import decode, GPath
+from ..bolt import decoder, GPath
 from ..bosh import omods
 from ..gui import Button, CancelButton, CENTER, CheckBox, GridLayout, \
     HLayout, Label, LayoutOptions, SaveButton, Spacer, Stretch, TextArea, \
@@ -220,7 +220,7 @@ class DocBrowser(WindowFrame):
                 # docs in Morrowind are cp1252. However, it most likely is
                 # UTF-8 or UTF-8-compatible (ASCII), so try that first.
                 with doc_path.open(u'rb') as ins:
-                    uni_str = decode(ins.read(), u'utf-8')
+                    uni_str = decoder(ins.read(), u'utf-8')
             self._doc_ctrl.load_text(uni_str)
 
     def SetMod(self, mod_name):

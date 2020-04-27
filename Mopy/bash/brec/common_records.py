@@ -39,7 +39,7 @@ from .mod_io import RecordHeader, GrupHeader
 from .record_structs import MelRecord, MelSet, MreRecord
 from .utils_constants import FID
 from .. import bolt, exception
-from ..bolt import decode, encode, GPath, sio
+from ..bolt import decoder, encode, GPath, sio
 from ..exception import StateError
 
 #------------------------------------------------------------------------------
@@ -68,8 +68,8 @@ class MreHeaderBase(MelRecord):
                 # Don't use ins.readString, because it will try to use
                 # bolt.pluginEncoding for the filename. This is one case where
                 # we want to use automatic encoding detection
-                master_name = decode(bolt.cstrip(ins.read(size_, readId)),
-                                     avoidEncodings=(u'utf8', u'utf-8'))
+                master_name = decoder(bolt.cstrip(ins.read(size_, readId)),
+                                      avoidEncodings=(u'utf8', u'utf-8'))
                 record.masters.append(GPath(master_name))
             else: # sub_type == 'DATA'
                 # DATA is the size for TES3, but unknown/unused for later games
@@ -197,7 +197,7 @@ class MreGmstBase(MelRecord):
             u'f': MelFloat('DATA', 'value'),
             u's': MelLString('DATA', 'value'),
         }, decider=AttrValDecider(
-            'eid', transformer=lambda eid: decode(eid[0]) if eid else u'i'),
+            'eid', transformer=lambda eid: decoder(eid[0]) if eid else u'i'),
             fallback=MelSInt32('DATA', 'value')
         ),
     )

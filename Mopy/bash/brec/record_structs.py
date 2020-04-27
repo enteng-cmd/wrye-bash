@@ -31,7 +31,7 @@ import zlib
 from .mod_io import ModReader, ModWriter
 from .utils_constants import strFid, _int_unpacker
 from .. import bolt, exception
-from ..bolt import decode, sio, struct_pack
+from ..bolt import decoder, sio, struct_pack
 
 #------------------------------------------------------------------------------
 # Mod Element Sets ------------------------------------------------------------
@@ -509,7 +509,7 @@ class MreRecord(object):
                     else:
                         value = bolt.cstrip(readRead(size))
                         break
-        return decode(value)
+        return decoder(value)
 
     def loadInfos(self,ins,endPos,infoClass):
         """Load infos from ins. Called from MobDials."""

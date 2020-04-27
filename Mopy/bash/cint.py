@@ -50,7 +50,7 @@ try:
     from .bolt import CBash as CBashEnabled
     from .bolt import GPath, deprint, Path
     from .bolt import encode as _enc
-    from .bolt import decode as _uni
+    from .bolt import decoder as _uni
     from . import bolt
     def _encode(text,*args,**kwdargs):
         if len(args) > 1:
