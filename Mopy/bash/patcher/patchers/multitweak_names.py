@@ -503,19 +503,19 @@ class _ATextReplacer(DynamicTweak, _ANamesTweak):
         self.re_replacement = reReplace
         # Convert the match/replace strings to record paths
         self._match_replace_rpaths = {
-            rec_sig: tuple([RecPath(r) for r in rpaths])
-            for rec_sig, rpaths in self._match_replace_rpaths.iteritems()
+            rsig: tuple([RecPath(r) for r in rpaths])
+            for rsig, rpaths in self._match_replace_rpaths.iteritems()
         }
 
     def wants_record(self, record):
         can_change = self.re_match.search
-        rec_sig = self._get_record_signature(record)
-        if rec_sig == b'GMST':
+        record_sig = self._get_record_signature(record)
+        if record_sig == b'GMST':
             # GMST can't be handled by RecPath (yet?), thankfully it's
             # identical for all games
             return record.eid[0] == u's' and can_change(record.value or u'')
         else:
-            for rp in self._match_replace_rpaths[rec_sig]: # type: RecPath
+            for rp in self._match_replace_rpaths[record_sig]: # type: RecPath
                 if not rp.rp_exists(record): continue
                 for val in rp.rp_eval(record):
                     if can_change(val or u''): return True
@@ -527,11 +527,11 @@ class _ATextReplacer(DynamicTweak, _ANamesTweak):
     def _exec_rename(self, record):
         sub_replacement, replacement = self.re_match.sub, self.re_replacement
         exec_replacement = partial(sub_replacement, replacement)
-        rec_sig = self._get_record_signature(record)
-        if rec_sig == b'GMST':
+        record_sig = self._get_record_signature(record)
+        if record_sig == b'GMST':
             record.value = exec_replacement(record.value)
         else:
-            for rp in self._match_replace_rpaths[rec_sig]: # type: RecPath
+            for rp in self._match_replace_rpaths[record_sig]: # type: RecPath
                 if rp.rp_exists(record):
                     rp.rp_map(record, exec_replacement)
 

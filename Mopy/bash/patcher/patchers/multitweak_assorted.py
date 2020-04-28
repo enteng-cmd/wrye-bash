@@ -850,9 +850,10 @@ class AAssortedTweak_DefaultIcons(_AAssortedTweak):
 
 class AssortedTweak_DefaultIcons(AAssortedTweak_DefaultIcons, _AssortPTweak):
     def wants_record(self, record):
-        if (record.recType == b'LIGH' and not record.flags.canTake or
-                record.recType == b'QUST' and not record.stages or
-                record.recType in (b'ARMO', b'CLOT') and
+        rsig = record.recType
+        if (rsig == b'LIGH' and not record.flags.canTake or
+                rsig == b'QUST' and not record.stages or
+                rsig in (b'ARMO', b'CLOT') and
                 self._is_nonplayable(record)): return False
         return super(AssortedTweak_DefaultIcons, self).wants_record(record)
 

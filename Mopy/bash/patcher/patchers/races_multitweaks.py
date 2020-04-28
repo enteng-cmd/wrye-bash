@@ -569,11 +569,10 @@ class RacePatcher(AMultiTweaker, ListPatcher):
                         pool_record(record)
                         break # Exit as soon as a tweak is interested
         # Finally, copy all pooled records in one fell swoop
-        for rec_sig in rec_pool:
-            pooled_records = rec_pool[rec_sig]
+        for rsig, pooled_records in rec_pool.iteritems():
             if pooled_records: # only copy if we could pool
-                getattr(self.patchFile, unicode(
-                    rec_sig, u'ascii')).copy_records(pooled_records)
+                getattr(self.patchFile, rsig.decode(u'ascii')).copy_records(
+                    pooled_records)
 
     def buildPatch(self,log,progress):
         """Updates races as needed."""
