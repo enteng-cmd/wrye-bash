@@ -388,11 +388,12 @@ class MelRaceParts(MelNull):
 class MelRaceVoices(MelStruct):
     """Set voices to zero, if equal race fid. If both are zero, then skip
     dumping."""
-    def dumpData(self, record, out):
+    def pack_subrecord_data(self, record):
         if record.maleVoice == record.fid: record.maleVoice = 0
         if record.femaleVoice == record.fid: record.femaleVoice = 0
         if (record.maleVoice, record.femaleVoice) != (0, 0):
-            MelStruct.dumpData(self, record, out)
+            return super(MelRaceVoices, self).pack_subrecord_data(record)
+        return None
 
 #------------------------------------------------------------------------------
 class MelScriptVars(MelGroups):
