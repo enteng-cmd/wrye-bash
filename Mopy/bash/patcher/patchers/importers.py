@@ -23,7 +23,6 @@
 # =============================================================================
 """This module contains the oblivion importer patcher classes."""
 from collections import defaultdict, Counter
-from functools import reduce
 from itertools import chain
 from operator import attrgetter
 # Internal
@@ -32,12 +31,35 @@ from ..base import AImportPatcher, AListPatcher
 from ... import bush, load_order
 from ...bolt import GPath, MemorySet
 from ...brec import MreRecord, MelObject
-from ...cint import ValidateDict, ValidateList, FormID, validTypes, \
-    getattr_deep, setattr_deep
-from ...parsers import ActorFactions, CBash_ActorFactions, FactionRelations, \
+from ...cint import ValidateDict, ValidateList, FormID, validTypes
+from ...mod_files import ModFile, LoadFactory
+from ...parsers import CBash_ActorFactions, FactionRelations, \
     CBash_FactionRelations, FullNames, CBash_FullNames, ItemStats, \
     CBash_ItemStats, SpellRecords, CBash_SpellRecords
-from ...mod_files import ModFile, LoadFactory
+
+# cache attrgetter objects
+class _AttrGettersCache(dict):
+    def __missing__(self, attr_name):
+        return self.setdefault(attr_name, attrgetter(attr_name))
+
+_attrgetters = _AttrGettersCache()
+
+# noinspection PyDefaultArgument
+def _setattr_deep(obj, attr, value, __attrgetters=_attrgetters,
+                  __split_cache={}):
+    try:
+        parent_attr, leaf_attr = __split_cache[attr]
+    except KeyError:
+        dot_dex = attr.rfind(u'.')
+        if dot_dex > 0:
+            parent_attr = attr[:dot_dex]
+            leaf_attr = attr[dot_dex + 1:]
+        else:
+            parent_attr = u''
+            leaf_attr = attr
+            __split_cache[attr] = parent_attr, leaf_attr
+    setattr(__attrgetters[parent_attr](obj) if parent_attr else obj,
+        leaf_attr, value)
 
 class _SimpleImporter(ImportPatcher):
     """For lack of a better name - common methods of a bunch of importers.
@@ -68,17 +90,19 @@ class _SimpleImporter(ImportPatcher):
         return tuple(
             x.rec_sig for x in self.srcClasses) if self.isActive else ()
 
-    def _init_data_loop(self, mapper, recClass, srcFile, srcMod, temp_id_data):
+    def _init_data_loop(self, mapper, recClass, srcFile, srcMod, temp_id_data,
+                        __attrgetters=_attrgetters):
         recAttrs = self.recAttrs_class[recClass]
         for record in srcFile.tops[recClass.rec_sig].getActiveRecords():
             fid = mapper(record.fid)
-            temp_id_data[fid] = dict(
-                (attr, record.__getattribute__(attr)) for attr in recAttrs)
+            temp_id_data[fid] = {attr: __attrgetters[attr](record) for attr in
+                                 recAttrs}
 
-    def initData(self, progress):
+    def initData(self, progress, __attrgetters=_attrgetters):
         """Common initData pattern.
 
-        Used in KFFZPatcher, DeathItemPatcher, SoundPatcher, ImportScripts.
+        Used in KFFZPatcher, DeathItemPatcher, SoundPatcher, ImportScripts,
+        WeaponModsPatcher, ActorImporter.
         Adding _init_data_loop absorbed GraphicsPatcher also.
         """
         if not self.isActive: return
@@ -122,18 +146,18 @@ class _SimpleImporter(ImportPatcher):
                         fid = mapper(record.fid)
                         if fid not in temp_id_data: continue
                         for attr, value in temp_id_data[fid].iteritems():
-                            if value == record.__getattribute__(attr): continue
+                            if value == __attrgetters[attr](record): continue
                             else:
                                 id_data[fid][attr] = value
             progress.plus()
         self.longTypes &= {x.rec_sig for x in self.srcClasses}
         self.isActive = bool(self.srcClasses)
 
-    def scanModFile(self, modFile, progress):
+    def scanModFile(self, modFile, progress, __attrgetters=_attrgetters):
         """Identical scanModFile() pattern of :
 
             GraphicsPatcher, KFFZPatcher, DeathItemPatcher, ImportScripts,
-            SoundPatcher, DestructiblePatcher.
+            SoundPatcher, DestructiblePatcher, ActorImporter, WeaponModsPatcher
         """
         id_data = self.id_data
         mapper = modFile.getLongMapper()
@@ -148,30 +172,12 @@ class _SimpleImporter(ImportPatcher):
                 if not record.longFids: fid = mapper(fid)
                 if fid not in id_data: continue
                 for attr, value in id_data[fid].iteritems():
-                    if record.__getattribute__(attr) != value:
+                    if __attrgetters[attr](record) != value:
                         patchBlock.setRecord(record.getTypeCopy(mapper))
                         break
 
-    def scanModFile2(self, modFile, progress):
-        """Scan mod file against source data."""
-        id_data = self.id_data
-        mapper = modFile.getLongMapper()
-        if self.longTypes:
-            modFile.convertToLongFids(self.longTypes)
-        for recClass in self.srcClasses:
-            if recClass.rec_sig not in modFile.tops: continue
-            patchBlock = getattr(self.patchFile, recClass.rec_sig)
-            for record in modFile.tops[recClass.rec_sig].getActiveRecords():
-                fid = record.fid
-                if not record.longFids: fid = mapper(fid)
-                if fid not in id_data: continue
-                for attr, value in id_data[fid].iteritems():
-                    # OOPS: line below is the only diff from _scanModFile()
-                    if reduce(getattr, attr.split('.'), record) != value:
-                        patchBlock.setRecord(record.getTypeCopy(mapper))
-                        break
-
-    def _inner_loop(self, keep, records, top_mod_rec, type_count):
+    def _inner_loop(self, keep, records, top_mod_rec, type_count,
+                    __attrgetters=_attrgetters, __setattr=setattr):
         """Most common pattern for the internal buildPatch() loop.
 
         In:
@@ -182,10 +188,10 @@ class _SimpleImporter(ImportPatcher):
             rec_fid = record.fid
             if rec_fid not in id_data: continue
             for attr, value in id_data[rec_fid].iteritems():
-                if record.__getattribute__(attr) != value: break
+                if __attrgetters[attr](record) != value: break
             else: continue
             for attr, value in id_data[rec_fid].iteritems():
-                record.__setattr__(attr, value)
+                __setattr(record, attr, value)
             keep(rec_fid)
             type_count[top_mod_rec] += 1
 
@@ -517,33 +523,6 @@ class DestructiblePatcher(_SimpleImporter):
     # All destructibles may contain FIDs, so let longTypes be set automatically
     rec_attrs = {x: ('destructible',) for x in bush.game.destructible_types}
 
-    def _inner_loop(self, keep, records, top_mod_rec, type_count):
-        id_data, set_id_data = self.id_data, set(self.id_data)
-        for record in records:
-            rec_fid = record.fid
-            if rec_fid not in set_id_data: continue
-            for attr, value in id_data[rec_fid].iteritems():
-                rec_attr = record.__getattribute__(attr)
-                if isinstance(rec_attr, str) and isinstance(value, str):
-                    if rec_attr.lower() != value.lower():
-                        break
-                    continue
-                elif attr == 'model':
-                    try:
-                        if rec_attr.modPath.lower() != value.modPath.lower():
-                            break
-                        continue
-                    except:
-                        break #assume they are not equal (ie they aren't __both__ NONE)
-                if rec_attr != value:
-                    break
-            else:
-                continue
-            for attr, value in id_data[rec_fid].iteritems():
-                record.__setattr__(attr, value)
-            keep(rec_fid)
-            type_count[top_mod_rec] += 1
-
 #------------------------------------------------------------------------------
 class GraphicsPatcher(_SimpleImporter):
     rec_attrs = bush.game.graphicsTypes
@@ -573,15 +552,15 @@ class GraphicsPatcher(_SimpleImporter):
         self.recFidAttrs_class = {MreRecord.type_class[recType]: attrs for
                         recType, attrs in bush.game.graphicsFidTypes.iteritems()}
 
-    def _init_data_loop(self, mapper, recClass, srcFile, srcMod, temp_id_data):
+    def _init_data_loop(self, mapper, recClass, srcFile, srcMod, temp_id_data,
+                        __attrgetters=_attrgetters):
         recAttrs = self.recAttrs_class[recClass]
         recFidAttrs = self.recFidAttrs_class.get(recClass, None)
         for record in srcFile.tops[recClass.rec_sig].getActiveRecords():
             fid = mapper(record.fid)
             if recFidAttrs:
-                attr_fidvalue = dict(
-                    (attr, record.__getattribute__(attr)) for attr in
-                    recFidAttrs)
+                attr_fidvalue = {attr: __attrgetters[attr](record) for attr in
+                                 recFidAttrs}
                 for fidvalue in attr_fidvalue.values():
                     if fidvalue and (fidvalue[0] is None or fidvalue[
                         0] not in self.patchFile.loadSet):
@@ -591,37 +570,37 @@ class GraphicsPatcher(_SimpleImporter):
                             self._patcher_name][srcMod] += 1
                         break
                 else:
-                    temp_id_data[fid] = dict(
-                        (attr, record.__getattribute__(attr)) for attr in
-                        recAttrs)
+                    temp_id_data[fid] = {attr: __attrgetters[attr](record) for
+                                         attr in recAttrs}
                     temp_id_data[fid].update(attr_fidvalue)
             else:
-                temp_id_data[fid] = dict(
-                    (attr, record.__getattribute__(attr)) for attr in recAttrs)
+                temp_id_data[fid] = {attr: __attrgetters[attr](record) for attr
+                                     in recAttrs}
 
-    def _inner_loop(self, keep, records, top_mod_rec, type_count):
+    def _inner_loop(self, keep, records, top_mod_rec, type_count,
+                    __attrgetters=_attrgetters, __setattr=setattr):
         id_data = self.id_data
         for record in records:
             fid = record.fid
             if fid not in id_data: continue
             for attr, value in id_data[fid].iteritems():
-                if isinstance(record.__getattribute__(attr),
+                rec_attr = __attrgetters[attr](record)
+                if isinstance(rec_attr,
                               basestring) and isinstance(value, basestring):
-                    if record.__getattribute__(attr).lower() != value.lower():
+                    if rec_attr.lower() != value.lower():
                         break
                     continue
                 elif attr in bush.game.graphicsModelAttrs:
                     try:
-                        if record.__getattribute__(
-                                attr).modPath.lower() != value.modPath.lower():
+                        if rec_attr.modPath.lower() != value.modPath.lower():
                             break
                         continue
                     except: break  # assume they are not equal (ie they
                         # aren't __both__ NONE)
-                if record.__getattribute__(attr) != value: break
+                if rec_attr != value: break
             else: continue
             for attr, value in id_data[fid].iteritems():
-                record.__setattr__(attr, value)
+                __setattr(record, attr, value)
             keep(fid)
             type_count[top_mod_rec] += 1
 
@@ -684,102 +663,21 @@ class ActorImporter(_SimpleImporter):
     # note peculiar mapping of record type to dictionaries[tag, attributes]
     rec_attrs = bush.game.actor_importer_attrs
 
-    def initData(self,progress):
-        """Get actors from source files."""
-        if not self.isActive: return
-        id_data = self.id_data
-        loadFactory = LoadFactory(False, *self.recAttrs_class.keys())
-        longTypes = self.longTypes & {x.rec_sig for x in self.recAttrs_class}
-        progress.setFull(len(self.srcs))
-        cachedMasters = {}
-        minfs = self.patchFile.p_file_minfos
-        for index,srcMod in enumerate(self.srcs):
-            temp_id_data = {}
-            if srcMod not in minfs: continue
-            srcInfo = minfs[srcMod]
-            srcFile = ModFile(srcInfo,loadFactory)
-            masters = srcInfo.get_masters()
-            srcFile.load(True)
-            srcFile.convertToLongFids(longTypes)
-            mapper = srcFile.getLongMapper()
-            for recClass in self.recAttrs_class:
-                if recClass.rec_sig not in srcFile.tops: continue
-                self.srcClasses.add(recClass)
-                self.classestemp.add(recClass)
-                self._init_data_loop(mapper, recClass, srcFile, srcMod,
-                                     temp_id_data)
-            for master in masters:
-                if master not in minfs: continue # or break filter mods
-                if master in cachedMasters:
-                    masterFile = cachedMasters[master]
-                else:
-                    masterInfo = minfs[master]
-                    masterFile = ModFile(masterInfo,loadFactory)
-                    masterFile.load(True)
-                    masterFile.convertToLongFids(longTypes)
-                    cachedMasters[master] = masterFile
-                mapper = masterFile.getLongMapper()
-                for recClass in self.recAttrs_class:
-                    if recClass.rec_sig not in masterFile.tops: continue
-                    if recClass not in self.classestemp: continue
-                    for record in masterFile.tops[
-                        recClass.rec_sig].getActiveRecords():
-                        fid = mapper(record.fid)
-                        if fid not in temp_id_data: continue
-                        for attr, value in temp_id_data[fid].iteritems():
-                            if isinstance(attr,basestring):
-                                if value == reduce(getattr, attr.split('.'),
-                                                   record):
-                                    continue
-                                else:
-                                    id_data[fid][attr] = value
-                            elif isinstance(attr,(list,tuple,set)):
-                                temp_values = {}
-                                keep = False
-                                for subattr in attr:
-                                    if value[subattr] != reduce(
-                                            getattr,subattr.split('.'),record):
-                                        keep = True
-                                    temp_values[subattr] = value[subattr]
-                                if keep:
-                                    id_data[fid].update(temp_values)
-            progress.plus()
-        self.longTypes &= {x.rec_sig for x in self.srcClasses}
-        self.isActive = bool(self.srcClasses)
-
-    def _init_data_loop(self, mapper, recClass, srcFile, srcMod, temp_id_data):
+    def _init_data_loop(self, mapper, recClass, srcFile, srcMod, temp_id_data,
+                        __attrgetters=_attrgetters):
         mod_tags = srcFile.fileInfo.getBashTags()
         tags_to_attrs = self.recAttrs_class[recClass]
         attrs = set(chain.from_iterable(
             attrs for t, attrs in tags_to_attrs.iteritems() if t in mod_tags))
         for record in srcFile.tops[recClass.rec_sig].getActiveRecords():
             fid = mapper(record.fid)
-            temp_id_data[fid] = dict()
-            for attr in attrs:
-                if isinstance(attr, basestring):
-                    temp_id_data[fid][attr] = reduce(getattr, attr.split('.'),
-                                                     record)
-                elif isinstance(attr, (list, tuple, set)):
-                    temp_id_data[fid][attr] = dict(
-                        (subattr, reduce(getattr, subattr.split('.'), record))
-                        for subattr in attr)
+            temp_id_data[fid] = {attr: __attrgetters[attr](record) for attr in
+                                 attrs}
 
-    scanModFile = _SimpleImporter.scanModFile2
-
-    def _inner_loop(self, keep, records, top_mod_rec, type_count):
-        id_data, set_id_data = self.id_data, set(self.id_data)
-        for record in records:
-            fid = record.fid
-            if fid not in set_id_data: continue
-            for attr, value in id_data[fid].iteritems():
-                if reduce(getattr, attr.split('.'), record) != value: break
-            else: continue
-            for attr, value in id_data[fid].iteritems():
-                # OOPS: line below is the only diff from base _inner_loop()
-                setattr(reduce(getattr, attr.split('.')[:-1], record),
-                        attr.split('.')[-1], value)
-            keep(fid)
-            type_count[top_mod_rec] += 1
+    def _inner_loop(self, keep, records, top_mod_rec, type_count,
+                    __attrgetters=_attrgetters, __setattr=_setattr_deep):
+        super(ActorImporter, self)._inner_loop(keep, records, top_mod_rec,
+            type_count, _attrgetters, __setattr)
 
 class CBash_ActorImporter(_RecTypeModLogging):
     _read_write_records = ('CREA', 'NPC_')
@@ -1322,19 +1220,20 @@ class ImportRelations(_SimpleImporter):
                 if fid not in id_relations: continue
                 patchBlock.setRecord(record.getTypeCopy(mapper))
 
-    def _inner_loop(self, keep, records, top_mod_rec, type_count):
-        id_data, set_id_data = self.id_data, set(self.id_data)
+    def _inner_loop(self, keep, records, top_mod_rec, type_count,
+                    __attrgetters=_attrgetters):
+        id_data= self.id_data
         rel_attrs = bush.game.relations_attrs
         for record in records:
             fid = record.fid
-            if fid in set_id_data:
-                newRelations = set(id_data[fid])
-                curRelations = set(tuple(getattr(r, a) for a in rel_attrs)
-                                   for r in record.relations)
+            if fid in id_data:
+                new_relations = set(id_data[fid])
+                cur_relations = {tuple(getattr(r, a) for a in rel_attrs) for r
+                                 in record.relations}
                 doKeep = False
                 # Preserve changed relations and create new relations for the
                 # added ones that have been merged
-                for changed_attrs in newRelations - curRelations:
+                for changed_attrs in new_relations - cur_relations:
                     # The target faction is always first, for all games
                     faction = changed_attrs[0]
                     for entry in record.relations:
@@ -2474,7 +2373,7 @@ class SpellsPatcher(ImportPatcher, _ASpellsPatcher):
         self.id_stat.update(spellStats.fid_stats)
         self.isActive = bool(self.id_stat)
 
-    def scanModFile(self, modFile, progress): # scanModFile4: ?
+    def scanModFile(self, modFile, progress, __attrgetters=_attrgetters): # scanModFile4: ?
         """Add affected items to patchFile."""
         if not self.isActive or 'SPEL' not in modFile.tops:
             return
@@ -2488,7 +2387,7 @@ class SpellsPatcher(ImportPatcher, _ASpellsPatcher):
             if fid in id_records: continue
             spellStats = id_stat.get(fid)
             if not spellStats: continue
-            oldValues = [getattr_deep(record, attr) for attr in spell_attrs]
+            oldValues = [_attrgetters[attr](record) for attr in spell_attrs]
             if oldValues != spellStats:
                 patchBlock.setRecord(record.getTypeCopy())
 
@@ -2505,10 +2404,10 @@ class SpellsPatcher(ImportPatcher, _ASpellsPatcher):
             rec_fid = record.fid
             spellStats = id_stat.get(rec_fid)
             if not spellStats: continue
-            oldValues = [getattr_deep(record, attr) for attr in spell_attrs]
+            oldValues = [_attrgetters[attr](record) for attr in spell_attrs]
             if oldValues == spellStats: continue
             for attr,value in zip(spell_attrs,spellStats):
-                setattr_deep(record,attr,value)
+                _setattr_deep(record,attr,value)
             keep(rec_fid)
             counts[rec_fid[0]] += 1
         self.id_stat.clear()
@@ -2572,119 +2471,18 @@ class WeaponModsPatcher(_SimpleImporter):
     """Merge changes to weapon modifications for FalloutNV."""
     scanOrder = 27
     editOrder = 27
-    rec_attrs = {'WEAP': ('modelWithMods', 'firstPersonModelWithMods',
-        'weaponMods', 'soundMod1Shoot3Ds', 'soundMod1Shoot2D', 'effectMod1',
-        'effectMod2', 'effectMod3', 'valueAMod1', 'valueAMod2', 'valueAMod3',
-        'valueBMod1', 'valueBMod2', 'valueBMod3', 'reloadAnimationMod',
-        'vatsModReqiured', 'scopeModel', 'dnamFlags1.hasScope',
-        'dnamFlags2.scopeFromMod')}
+    rec_attrs = {b'WEAP': (
+        u'modelWithMods', u'firstPersonModelWithMods', u'weaponMods',
+        u'soundMod1Shoot3Ds', u'soundMod1Shoot2D', u'effectMod1',
+        u'effectMod2', u'effectMod3', u'valueAMod1', u'valueAMod2',
+        u'valueAMod3', u'valueBMod1', u'valueBMod2', u'valueBMod3',
+        u'reloadAnimationMod', u'vatsModReqiured', u'scopeModel',
+        u'dnamFlags1.hasScope', u'dnamFlags2.scopeFromMod')}
 
-    def initData(self,progress):
-        """Get graphics from source files."""
-        if not self.isActive: return
-        id_data = self.id_data
-        loadFactory = LoadFactory(False, *self.recAttrs_class.keys())
-        longTypes = self.longTypes & {x.rec_sig for x in self.recAttrs_class}
-        progress.setFull(len(self.srcs))
-        cachedMasters = {}
-        minfs = self.patchFile.p_file_minfos
-        for index,srcMod in enumerate(self.srcs):
-            temp_id_data = {}
-            if srcMod not in minfs: continue
-            srcInfo = minfs[srcMod]
-            srcFile = ModFile(srcInfo,loadFactory)
-            masters = srcInfo.get_masters()
-            srcFile.load(True)
-            srcFile.convertToLongFids(longTypes)
-            mapper = srcFile.getLongMapper()
-            for recClass in self.recAttrs_class:
-                if recClass.rec_sig not in srcFile.tops: continue
-                self.srcClasses.add(recClass)
-                self.classestemp.add(recClass)
-                self._init_data_loop(mapper, recClass, srcFile, srcMod,
-                                     temp_id_data)
-            for master in masters:
-                if master not in minfs: continue # or break filter mods
-                if master in cachedMasters:
-                    masterFile = cachedMasters[master]
-                else:
-                    masterInfo = minfs[master]
-                    masterFile = ModFile(masterInfo,loadFactory)
-                    masterFile.load(True)
-                    masterFile.convertToLongFids(longTypes)
-                    cachedMasters[master] = masterFile
-                mapper = masterFile.getLongMapper()
-                for recClass in self.recAttrs_class:
-                    if recClass.rec_sig not in masterFile.tops: continue
-                    if recClass not in self.classestemp: continue
-                    for record in masterFile.tops[
-                        recClass.rec_sig].getActiveRecords():
-                        fid = mapper(record.fid)
-                        if fid not in temp_id_data: continue
-                        for attr, value in temp_id_data[fid].iteritems():
-                            #if value == record.__getattribute__(attr): continue
-                            if value == reduce(getattr, attr.split('.'), record): continue
-                            else:
-                                id_data[fid][attr] = value
-            progress.plus()
-        self.longTypes &= {x.rec_sig for x in self.srcClasses}
-        self.isActive = bool(self.srcClasses)
-
-    def _init_data_loop(self, mapper, recClass, srcFile, srcMod, temp_id_data):
-        recAttrs = self.recAttrs_class[recClass]
-        for record in srcFile.tops[recClass.rec_sig].getActiveRecords():
-            fid = mapper(record.fid)
-            #temp_id_data[fid] = dict((attr,record.__getattribute__(attr))
-            # for attr in recAttrs)
-            temp_id_data[fid] = dict(
-                (attr, reduce(getattr, attr.split('.'), record)) for attr in
-                recAttrs)
-
-    scanModFile = _SimpleImporter.scanModFile2
-
-    def buildPatch(self, log, progress, types=None):
-        """Merge last version of record with patched destructible data as needed."""
-        if not self.isActive: return
-        modFile = self.patchFile
-        keep = self.patchFile.getKeeper()
-        id_data = self.id_data
-        type_count = {}
-        for recClass in self.srcClasses:
-            type = recClass.rec_sig
-            if type not in modFile.tops: continue
-            type_count[type] = 0
-            for record in modFile.tops[type].records:
-                fid = record.fid
-                if fid not in id_data: continue
-                for attr,value in id_data[fid].iteritems():
-                    #if isinstance(record.__getattribute__(attr),str) and isinstance(value, str):
-                    if isinstance(reduce(getattr, attr.split('.'), record),str) and isinstance(value, str):
-                        #if record.__getattribute__(attr).lower() != value.lower():
-                        if reduce(getattr, attr.split('.'), record).lower() != value.lower():
-                            break
-                        continue
-                    elif attr == 'model':
-                        try:
-                            #if record.__getattribute__(attr).modPath.lower() != value.modPath.lower():
-                            if reduce(getattr, attr.split('.'), record).modPath.lower() != value.modPath.lower():
-                                break
-                            continue
-                        except:
-                            break #assume they are not equal (ie they aren't __both__ NONE)
-                    #if record.__getattribute__(attr) != value:
-                    if reduce(getattr, attr.split('.'), record) != value:
-                        break
-                else:
-                    continue
-                for attr,value in id_data[fid].iteritems():
-                    #record.__setattr__(attr,value)
-                    sattr = attr.split('.')
-                    lastattr = sattr.pop()
-                    reduce(getattr, sattr, record).__setattr__(lastattr, value)
-                keep(fid)
-                type_count[type] += 1
-        id_data = None
-        self._patchLog(log, type_count)
+    def _inner_loop(self, keep, records, top_mod_rec, type_count,
+                    __attrgetters=_attrgetters, __setattr=_setattr_deep):
+        super(WeaponModsPatcher, self)._inner_loop(keep, records, top_mod_rec,
+            type_count, _attrgetters, __setattr)
 
 #------------------------------------------------------------------------------
 class KeywordsImporter(_SimpleImporter):
