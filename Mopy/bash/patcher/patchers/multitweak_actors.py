@@ -296,8 +296,8 @@ class VanillaNPCSkeletonPatcher(AVanillaNPCSkeletonPatcher,BasalNPCTweaker):
             record = record.getTypeCopy(mapper)
             if not record.model: continue #for freaking weird esps with NPC's
             # with no skeleton assigned to them(!)
-            model = record.model.modPath
-            if model.lower() == u'characters\\_male\\skeleton.nif':
+            modPath = record.model.modPath
+            if modPath.lower() == u'characters\\_male\\skeleton.nif':
                 patchRecords.setRecord(record)
 
     def buildPatch(self,log,progress,patchFile):

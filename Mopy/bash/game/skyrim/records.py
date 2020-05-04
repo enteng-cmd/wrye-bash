@@ -56,10 +56,10 @@ if brec.MelModel is None:
             'DMDL': ('DMDL', 'DMDT', 'DMDS'),
         }
 
-        def __init__(self, attr='model', subType='MODL'):
+        def __init__(self, subType='MODL'):
             types = self.__class__.typeSets[subType]
             MelGroup.__init__(
-                self, attr,
+                self, u'model',
                 MelString(types[0], 'modPath'),
                 # Ignore texture hashes - they're only an
                 # optimization, plenty of records in Skyrim.esm
@@ -266,7 +266,7 @@ class MelDestructible(MelGroup):
                           (MelDestructible.MelDestStageFlags, u'flagsDest'),
                           u'selfDamagePerSecond', (FID, u'explosion'),
                           (FID, u'debris'), u'debrisCount'),
-                MelModel('model','DMDL'),
+                MelModel(subType=b'DMDL'),
                 MelBase('DSTF','footer'),
             ),
         )
