@@ -29,7 +29,6 @@ import copy
 import errno
 import os
 import re
-import subprocess
 import sys
 import time
 from binascii import crc32
@@ -1065,7 +1064,9 @@ class Installer(object):
         self.ipath.makedirs() #--In case it just got wiped out.
 
     def _do_sync_data(self, proj_dir, delta_files, fresh_src_dest):
-        """TODO"""
+        """Performs a Sync from Data on the specified project directory with
+        the specified missing or mismatched files. fresh_src_dest must be an
+        up-to-date result of refreshDataSizeCrc()."""
         data_dir_join = bass.dirs[u'mods'].join
         norm_ghost_get = Installer.getGhosted().get
         upt_numb = del_numb = 0
