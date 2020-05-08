@@ -29,9 +29,9 @@ import os
 import struct
 
 # no local imports beyond this, imported everywhere in brec
-from .utils_constants import _int_unpacker, null1, strFid
-from .. import bolt, exception
-from ..bolt import decoder, struct_pack, struct_unpack
+from .utils_constants import _int_unpacker, strFid
+from .. import exception
+from ..bolt import struct_pack, struct_unpack, PluginStr
 
 #------------------------------------------------------------------------------
 # Headers ---------------------------------------------------------------------
@@ -266,6 +266,12 @@ class ModReader(object):
                                          self.size)
         return self.ins.read(size)
 
+    class _TranslatedPluginStr(PluginStr):
+
+        def __init__(self, decoded_string):
+            super(ModReader._TranslatedPluginStr, self).__init__()
+            self._decoded_str = decoded_string
+
     def readLString(self, size, recType='----', __unpacker=_int_unpacker):
         """Read translatable string. If the mod has STRINGS files, this is a
         uint32 to lookup the string in the string table. Otherwise, this is a
@@ -275,25 +281,10 @@ class ModReader(object):
                 endPos = self.ins.tell() + size
                 raise exception.ModReadError(self.inName, recType, endPos, self.size)
             id_, = self.unpack(__unpacker, 4, recType)
-            if id_ == 0: return u''
-            else: return self.strings.get(id_,u'LOOKUP FAILED!') #--Same as Skyrim
+            return ModReader._TranslatedPluginStr(
+                self.strings.get(id_, u'LOOKUP FAILED!') if id_ else u'')
         else:
-            return self.readString(size,recType)
-
-    def readString32(self, recType='----', __unpacker=_int_unpacker):
-        """Read wide pascal string: uint32 is used to indicate length."""
-        strLen, = self.unpack(__unpacker, 4, recType)
-        return self.readString(strLen,recType)
-
-    def readString(self,size,recType='----'):
-        """Read string from file, stripping zero terminator."""
-        return u'\n'.join(decoder(x,bolt.pluginEncoding,avoidEncodings=('utf8','utf-8')) for x in
-                          bolt.cstrip(self.read(size,recType)).split('\n'))
-
-    def readStrings(self,size,recType='----'):
-        """Read strings from file, stripping zero terminator."""
-        return [decoder(x,bolt.pluginEncoding,avoidEncodings=('utf8','utf-8')) for x in
-                self.read(size,recType).rstrip(null1).split(null1)]
+            return PluginStr(self.read(size, recType))
 
     def unpack(self, struct_unpacker, size, recType='----'):
         """Read size bytes from the file and unpack according to format of

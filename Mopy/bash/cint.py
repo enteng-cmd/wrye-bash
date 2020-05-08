@@ -1973,7 +1973,7 @@ class CBashSTRING(object):
     def __get__(self, instance, owner):
         _CGetField.restype = c_char_p
         retValue = _CGetField(instance._RecordID, self._FieldID, 0, 0, 0, 0, 0, 0, 0)
-        return _unicode(retValue,avoidEncodings=('utf8','utf-8')) if retValue else None
+        return _unicode(retValue,avoidEncodings=(u'utf8',u'utf-8')) if retValue else None
 
     def __set__(self, instance, nValue):
         if nValue is None: _CDeleteField(instance._RecordID, self._FieldID, 0, 0, 0, 0, 0, 0)
@@ -1990,7 +1990,7 @@ class CBashUNICODE(object):
     def __get__(self, instance, owner):
         _CGetField.restype = c_char_p
         retValue = _CGetField(instance._RecordID, self._FieldID, 0, 0, 0, 0, 0, 0, 0)
-        return _uni(retValue,avoidEncodings=('utf8','utf-8')) if retValue else None
+        return _uni(retValue,avoidEncodings=(u'utf8',u'utf-8')) if retValue else None
 
     def __set__(self, instance, nValue):
         if nValue is None: _CDeleteField(instance._RecordID, self._FieldID, 0, 0, 0, 0, 0, 0)

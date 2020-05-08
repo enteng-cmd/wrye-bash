@@ -87,7 +87,7 @@ class SaveFileHeader(object):
         self.calc_time()
         self.pcName = decoder(cstrip(self.pcName))
         self.pcLocation = decoder(cstrip(self.pcLocation), bolt.pluginEncoding,
-                                  avoidEncodings=('utf8', 'utf-8'))
+                                  avoidEncodings=(u'utf8', u'utf-8'))
         self.masters = [bolt.GPath(decoder(x)) for x in self.masters]
 
     def load_image_data(self, ins):

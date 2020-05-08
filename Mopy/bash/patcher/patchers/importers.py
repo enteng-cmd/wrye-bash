@@ -166,10 +166,10 @@ class _SimpleImporter(ImportPatcher):
 
     def _inner_loop(self, keep, records, top_mod_rec, type_count,
                     __attrgetters=_attrgetters, __setattr=setattr):
-        """Most common pattern for the internal buildPatch() loop.
-
-        In:
-            KFFZPatcher, DeathItemPatcher, ImportScripts, SoundPatcher
+        """Common pattern of the internal buildPatch() loop for all but:
+            - ActorImporter, WeaponModsPatcher: use _setattr_deep
+            - GraphicsPatcher: compares a subattr and sets the attr
+            - ImportRelations: modifies record.relations (no setattr)
         """
         id_data = self.id_data
         for record in records:
@@ -570,18 +570,11 @@ class GraphicsPatcher(_SimpleImporter):
             if fid not in id_data: continue
             for attr, value in id_data[fid].iteritems():
                 rec_attr = __attrgetters[attr](record)
-                if isinstance(rec_attr,
-                              basestring) and isinstance(value, basestring):
-                    if rec_attr.lower() != value.lower():
+                if attr in bush.game.graphicsModelAttrs:
+                    # TODO handle comparison in MelObject for MelModel
+                    if rec_attr.modPath != value.modPath:
                         break
                     continue
-                elif attr in bush.game.graphicsModelAttrs:
-                    try:
-                        if rec_attr.modPath.lower() != value.modPath.lower():
-                            break
-                        continue
-                    except: break  # assume they are not equal (ie they
-                        # aren't __both__ NONE)
                 if rec_attr != value: break
             else: continue
             for attr, value in id_data[fid].iteritems():
