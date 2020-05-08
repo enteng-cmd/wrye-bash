@@ -39,13 +39,14 @@ from ...brec import MelRecord, MelObject, MelGroups, MelStruct, FID, \
     MelTruncatedStruct, MelIcons, MelIcons2, MelIcon, MelIco2, MelEdid, \
     MelFull, MelArray, MelWthrColors, GameDecider, MelReadOnly, \
     MreDialBase, MreActorBase, MreWithItems, MelCtdaFo3, MelRef3D, MelXlod, \
-    MelWorldBounds, MelEnableParent, MelRefScale, MelMapMarker, BipedFlags
+    MelWorldBounds, MelEnableParent, MelRefScale, MelMapMarker, BipedFlags, \
+    MelModelCompare
 from ...exception import ModError, ModSizeError, StateError
 # Set MelModel in brec but only if unset, otherwise we are being imported from
 # fallout4.records
 if brec.MelModel is None:
 
-    class _MelModel(MelGroup):
+    class _MelModel(MelModelCompare):
         """Represents a model record."""
         # MODB and MODD are no longer used by TES5Edit
         typeSets = {

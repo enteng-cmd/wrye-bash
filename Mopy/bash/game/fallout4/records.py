@@ -27,11 +27,11 @@ from ... import brec
 from ...brec import MelBase, MelGroup, MreHeaderBase, MelSet, MelString, \
     MelStruct, MelUnicode, MelNull, MelFidList, MreLeveledListBase, MelFid, \
     FID, MelLString, MelUInt8, MelOptFid, MelOptFloat, MelBounds, MelEdid, \
-    MelArray
+    MelArray, MelModelCompare
 # Set brec.MelModel to the Fallout 4 one - do not import from skyrim.records yet
 if brec.MelModel is None:
 
-    class _MelModel(MelGroup):
+    class _MelModel(MelModelCompare):
         """Represents a model record."""
         # MODB and MODD are no longer used by TES5Edit
         typeSets = {

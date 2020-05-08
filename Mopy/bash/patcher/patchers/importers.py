@@ -168,7 +168,6 @@ class _SimpleImporter(ImportPatcher):
                     __attrgetters=_attrgetters, __setattr=setattr):
         """Common pattern of the internal buildPatch() loop for all but:
             - ActorImporter, WeaponModsPatcher: use _setattr_deep
-            - GraphicsPatcher: compares a subattr and sets the attr
             - ImportRelations: modifies record.relations (no setattr)
         """
         id_data = self.id_data
@@ -561,26 +560,6 @@ class GraphicsPatcher(_SimpleImporter):
             else:
                 temp_id_data[record.fid] = {attr: __attrgetters[attr](record)
                                             for attr in recAttrs}
-
-    def _inner_loop(self, keep, records, top_mod_rec, type_count,
-                    __attrgetters=_attrgetters, __setattr=setattr):
-        id_data = self.id_data
-        for record in records:
-            fid = record.fid
-            if fid not in id_data: continue
-            for attr, value in id_data[fid].iteritems():
-                rec_attr = __attrgetters[attr](record)
-                if attr in bush.game.graphicsModelAttrs:
-                    # TODO handle comparison in MelObject for MelModel
-                    if rec_attr.modPath != value.modPath:
-                        break
-                    continue
-                if rec_attr != value: break
-            else: continue
-            for attr, value in id_data[fid].iteritems():
-                __setattr(record, attr, value)
-            keep(fid)
-            type_count[top_mod_rec] += 1
 
 class CBash_GraphicsPatcher(_RecTypeModLogging):
     _read_write_records = (

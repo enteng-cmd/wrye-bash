@@ -42,12 +42,13 @@ from ...brec import MelRecord, MelGroups, MelStruct, FID, MelGroup, \
     MelCoordinates, MelIcons, MelIcons2, MelIcon, MelIco2, MelEdid, MelFull, \
     MelArray, MelWthrColors, MreLeveledListBase, MreDialBase, MreActorBase, \
     MreWithItems, MelCtdaFo3, MelRef3D, MelXlod, MelNull, MelWorldBounds, \
-    MelEnableParent, MelRefScale, MelMapMarker, MelActionFlags, BipedFlags
+    MelEnableParent, MelRefScale, MelMapMarker, MelActionFlags, BipedFlags, \
+    MelModelCompare
 from ...exception import ModError, ModSizeError
 # Set MelModel in brec but only if unset
 if brec.MelModel is None:
 
-    class _MelModel(MelGroup):
+    class _MelModel(MelModelCompare):
         """Represents a model record."""
         typeSets = (('MODL', 'MODB', 'MODT', 'MODS', 'MODD'),
                     ('MOD2', 'MO2B', 'MO2T', 'MO2S'),

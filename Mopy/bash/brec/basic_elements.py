@@ -57,6 +57,24 @@ class MelObject(object):
                         u'%s: %r' % (obj_attr, getattr(self, obj_attr)))
         return u'<%s>' % u', '.join(sorted(to_show)) # is sorted() needed here?
 
+class AttrsCompare(MelObject):
+    compare_attrs = frozenset()
+
+    def __eq__(self, other):
+        return all(getattr(self, x) == getattr(other, x) for x in
+                   self.compare_attrs) if isinstance(other,
+            type(self)) else NotImplemented
+
+    def __ne__(self, other):
+        return any(getattr(self, x) != getattr(other, x) for x in
+                   self.compare_attrs) if isinstance(other,
+            type(self)) else NotImplemented
+
+    def __hash__(self):
+        return hash(_make_hashable(
+            {k: v for k, v in self.__dict__.iteritems() if
+             k in self.compare_attrs}))
+
 class Subrecord(object):
     """A subrecord. Base class defines the subrecord format and packing."""
     # Format used by sub-record headers. Morrowind uses a different one.

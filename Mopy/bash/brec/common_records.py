@@ -32,7 +32,8 @@ from operator import attrgetter
 from .advanced_elements import AttrExistsDecider, AttrValDecider, MelArray, \
     MelUnion
 from .basic_elements import MelBase, MelFid, MelFids, MelFloat, MelGroups, \
-    MelLString, MelNull, MelStruct, MelUInt32, MelSInt32, MelUnicode
+    MelLString, MelNull, MelStruct, MelUInt32, MelSInt32, MelUnicode, MelGroup, \
+    MelObject, AttrsCompare
 from .common_subrecords import MelEdid
 from .mod_io import RecordHeader, GrupHeader
 from .record_structs import MelRecord, MelSet, MreRecord
@@ -449,3 +450,12 @@ class MreActorBase(MreWithItems):
         super(MreActorBase, self).mergeFilter(modSet)
         self.spells = [x for x in self.spells if x[0] in modSet]
         self.factions = [x for x in self.factions if x.faction[0] in modSet]
+
+#------------------------------------------------------------------------------
+class MelModelCompare(MelGroup):
+
+    class _CompareModPaths(AttrsCompare):
+        compare_attrs = frozenset([u'modPath'])
+
+    def getDefault(self, _mel_obj_type=_CompareModPaths):
+        return super(MelModelCompare, self).getDefault(_mel_obj_type)

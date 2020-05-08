@@ -38,11 +38,12 @@ from ...brec import MelRecord, MelGroups, MelStruct, FID, MelGroup, \
     MelTruncatedStruct, MelCoordinates, MelIcon, MelIco2, MelEdid, MelFull, \
     MelArray, MelWthrColors, MelObject, MreDialBase, MreActorBase, \
     MreWithItems, MelReadOnly, MelCtda, MelRef3D, MelXlod, MelWorldBounds, \
-    MelEnableParent, MelRefScale, MelMapMarker, MelActionFlags, BipedFlags
+    MelEnableParent, MelRefScale, MelMapMarker, MelActionFlags, BipedFlags, \
+    MelModelCompare
 # Set brec MelModel to the one for Oblivion
 if brec.MelModel is None:
 
-    class _MelModel(MelGroup):
+    class _MelModel(MelModelCompare):
         """Represents a model record."""
         typeSets = (('MODL','MODB','MODT'),
                     ('MOD2','MO2B','MO2T'),
