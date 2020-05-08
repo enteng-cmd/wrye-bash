@@ -38,7 +38,7 @@ from .mod_io import RecordHeader, GrupHeader
 from .record_structs import MelRecord, MelSet, MreRecord
 from .utils_constants import FID
 from .. import bolt, exception
-from ..bolt import decoder, GPath, struct_pack, ChardetStr
+from ..bolt import decoder, struct_pack, ChardetStr
 from ..exception import StateError
 
 #------------------------------------------------------------------------------
@@ -55,7 +55,7 @@ class MreHeaderBase(MelRecord):
             loaders[b'MAST'] = loaders[b'DATA'] = self
 
         def getSlotsUsed(self):
-            return (u'masters', u'master_sizes')
+            return u'masters', u'master_sizes'
 
         def setDefault(self, record):
             record.masters = []
@@ -64,12 +64,7 @@ class MreHeaderBase(MelRecord):
         def load_data(self, record, ins, sub_type, size_, readId,
                       __unpacker=struct.Struct(u'Q').unpack):
             if sub_type == b'MAST':
-                # Don't use ins.readString, because it will try to use
-                # bolt.pluginEncoding for the filename. This is one case where
-                # we want to use automatic encoding detection
-                master_name = decoder(bolt.cstrip(ins.read(size_, readId)),
-                                      avoidEncodings=(u'utf8', u'utf-8'))
-                record.masters.append(GPath(master_name))
+                record.masters.append(ChardetStr(ins.read(size_, readId)))
             else: # sub_type == 'DATA'
                 # DATA is the size for TES3, but unknown/unused for later games
                 record.master_sizes.append(
@@ -85,8 +80,7 @@ class MreHeaderBase(MelRecord):
                     num_masters - num_sizes)
             for master_name, master_size in zip(record.masters,
                                                 record.master_sizes):
-                MelUnicode(b'MAST', '').packSub(out, ChardetStr(
-                    master_name.s.encode(u'cp1252')),
+                MelUnicode(b'MAST', '').packSub(out, master_name,
                     force_encoding=u'cp1252')
                 MelBase(b'DATA', '').packSub(
                     out, struct_pack(u'Q', master_size))

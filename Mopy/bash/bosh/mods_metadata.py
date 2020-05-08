@@ -28,7 +28,8 @@ import struct
 from ._mergeability import is_esl_capable
 from .loot_parser import libloot_version, LOOTParser
 from .. import balt, bolt, bush, bass, load_order
-from ..bolt import GPath, deprint, sio, struct_pack, struct_unpack
+from ..bolt import GPath, deprint, sio, struct_pack, struct_unpack, \
+    PluginStr, decoder
 from ..brec import ModReader, MreRecord, RecordHeader, SubrecordBlob, null1
 from ..cint import ObBaseRecord, ObCollection
 from ..exception import BoltError, CancelError, ModError
@@ -602,7 +603,7 @@ class ModCleaner(object):
                                         eid = u''
                                         for subrec in record.iterate_subrecords(mel_sigs={b'EDID', b'XCLC'}):
                                             if subrec.mel_sig == b'EDID':
-                                                eid = bolt.decoder(subrec.mel_data)
+                                                eid = decoder(subrec.mel_data)
                                             elif subrec.mel_sig == b'XCLC':
                                                 pos = struct_unpack(u'=2i',
                                                     subrec.mel_data[:8])
@@ -730,9 +731,8 @@ class ModDetails(object):
                         subrec = SubrecordBlob(recs, recType, mel_sigs={u'EDID'})
                         if subrec.mel_data is not None:
                             # FIXME copied from readString
-                            eid = u'\n'.join(bolt.decoder(x, bolt.pluginEncoding,
-                                avoidEncodings=(u'utf8', u'utf-8')) for x
-                                in subrec.mel_data.rstrip(null1).split('\n'))
+                            eid = u'\n'.join([u'%s' % PluginStr(x) for x
+                                in subrec.mel_data.rstrip(null1).split('\n')])
                             break
                         recs.seek(rec_siz, 1)
                     records.append((header.fid,eid))

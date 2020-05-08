@@ -294,6 +294,8 @@ class PluginStr(bytes):
     """Plugin string - decode/clip when needed in comparisons. Base class
     will use pluginEncoding for decoding."""
     _preferred_encoding = None
+    _avoid_encodings = {u'utf8', u'utf-8'}
+    _min_size = 0
 
     @property
     def preferred_encoding(self):
@@ -307,7 +309,7 @@ class PluginStr(bytes):
             # it may happen to have more that one null terminator
             byte_str = self.rstrip(b'\x00')
             self._decoded_str = decoder(byte_str, self.preferred_encoding,
-                avoidEncodings=(u'utf8', u'utf-8'))
+                avoidEncodings=self._avoid_encodings)
             return self._decoded_str
 
     def reencode(self, target_encoding, maxSize=None, minSize=0):

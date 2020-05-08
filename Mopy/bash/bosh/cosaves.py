@@ -34,10 +34,10 @@ import re
 import string
 from itertools import imap
 from . import bak_file_pattern
-from ..bolt import sio, decoder, encode, struct_pack, struct_unpack, \
-    unpack_string, unpack_int, unpack_short, unpack_4s, unpack_byte, \
-    unpack_str16, unpack_float, unpack_double, unpack_int_signed, \
-    unpack_str32, AFile, unpack_spaced_string
+from ..bolt import sio, encode, struct_pack, struct_unpack, unpack_string, \
+    unpack_int, unpack_short, unpack_4s, unpack_byte, unpack_str16, \
+    unpack_float, unpack_double, unpack_int_signed, unpack_str32, AFile, \
+    unpack_spaced_string, PluginStr
 from ..exception import AbstractError, FileError, BoltError
 
 #------------------------------------------------------------------------------
@@ -45,23 +45,22 @@ from ..exception import AbstractError, FileError, BoltError
 def _pack(buff, fmt, *args): buff.write(struct_pack(fmt, *args))
 _cosave_encoding = u'cp1252' # TODO Do Pluggy files use this encoding as well?
 # decoder() / encode() with _cosave_encoding as encoding
-def _cosave_decode(byte_str): return decoder(byte_str,
-                                             encoding=_cosave_encoding)
-def _cosave_encode(uni_str): return encode(uni_str,
-                                           firstEncoding=_cosave_encoding)
+class _CosaveStr(PluginStr):
+    _preferred_encoding = _cosave_encoding
+    _avoid_encodings = set()
 # Convenient methods for reading and writing that use the methods from above
-def _unpack_cosave_str16(ins): return _cosave_decode(unpack_str16(ins))
-def _pack_cosave_str16(out, uni_str):
-    _pack(out, '=H', len(uni_str))
-    out.write(_cosave_encode(uni_str))
-def _unpack_cosave_str32(ins): return _cosave_decode(unpack_str32(ins))
-def _pack_cosave_str32(out, uni_str):
-    _pack(out, '=I', len(uni_str))
-    out.write(_cosave_encode(uni_str))
+def _unpack_cosave_str16(ins): return _CosaveStr(unpack_str16(ins))
+def _pack_cosave_str16(out, co_str):
+    _pack(out, u'=H', len(co_str))
+    out.write(co_str)
+def _unpack_cosave_str32(ins): return _CosaveStr(unpack_str32(ins))
+def _pack_cosave_str32(out, co_str):
+    _pack(out, u'=I', len(co_str))
+    out.write(co_str)
 def _unpack_cosave_space_str(ins):
-    return _cosave_decode(unpack_spaced_string(ins))
-def _pack_cosave_space_str(out, uni_str):
-    out.write(_cosave_encode(uni_str).replace(b' ', b'\x07') + b' ')
+    return _CosaveStr(unpack_spaced_string(ins))
+def _pack_cosave_space_str(out, co_str):
+    out.write(co_str.replace(b' ', b'\x07') + b' ')
 
 class _Remappable(object):
     """Mixin for objects inside cosaves that have to be updated when the names
@@ -69,11 +68,12 @@ class _Remappable(object):
     __slots__ = ()
 
     def remap_plugins(self, plugin_renames):
+        # type: (dict[PluginStr, PluginStr]) -> object
         """Remaps the names of relevant plugin entries in this object.
 
         :param plugin_renames: A dictionary containing the renames: key is the
             name of the plugin before the renaming, value is the name
-            afterwards."""
+            afterwards. Values should be already encoded (may not be cp1252 !)"""
         raise AbstractError()
 
 class _Dumpable(object):
@@ -125,7 +125,7 @@ class _AHeader(_Dumpable):
 
         :param ins: The input stream to read from.
         :param cosave_path: The path to the cosave."""
-        actual_tag = _cosave_decode(unpack_string(ins, len(self.savefile_tag)))
+        actual_tag = _CosaveStr(unpack_string(ins, len(self.savefile_tag)))
         if actual_tag != self.savefile_tag:
             raise FileError(cosave_path.tail, u'Header tag wrong: got %s, but '
                                               u'expected %s' %
@@ -136,7 +136,7 @@ class _AHeader(_Dumpable):
         just writes the save file tag.
 
         :param out: The output stream to write to."""
-        out.write(_cosave_encode(self.savefile_tag))
+        out.write(encode(self.savefile_tag, firstEncoding=_cosave_encoding))
 
     def dump_to_log(self, log, save_masters):
         log.setHeader(_(u'%s Header') % self.savefile_tag)
@@ -223,10 +223,10 @@ class _xSEChunk(_AChunk):
     # Whether or not we've fully decoded this chunk. If that is the case, the
     # fallback functionality is disabled.
     fully_decoded = False
-    __slots__ = (u'chunk_type', u'chunk_version', u'data_len', u'chunk_data')
+    __slots__ = (u'_chunk_sig', u'chunk_version', u'data_len', u'chunk_data')
 
     def __init__(self, ins, chunk_type):
-        self.chunk_type = chunk_type
+        self._chunk_sig = chunk_type # inverted chunk sig, see _get_xse_chunk
         self.chunk_version = unpack_int(ins)
         self.data_len = unpack_int(ins)
         # If we haven't fully decoded this chunk, treat it as a binary blob
@@ -235,7 +235,7 @@ class _xSEChunk(_AChunk):
 
     def write_chunk(self, out):
         # Don't forget to reverse signature when writing again
-        _pack(out, '=4s', _cosave_encode(self.chunk_type[::-1]))
+        _pack(out, '=4s', self._chunk_sig[::-1])
         _pack(out, '=I', self.chunk_version)
         _pack(out, '=I', self.chunk_length())
         # If we haven't fully decoded this chunk, treat it as a binary blob
@@ -258,40 +258,41 @@ class _xSEChunk(_AChunk):
 class _xSEModListChunk(_xSEChunk, _Dumpable, _Remappable):
     """An abstract class for chunks that contain a list of mods (e.g. MODS or
     LIMD) """
-    __slots__ = ('mod_names',)
+    __slots__ = ('_mod_names',)
 
     def __init__(self, ins, chunk_type):
         super(_xSEModListChunk, self).__init__(ins, chunk_type)
-        self.mod_names = []
+        self._mod_names = [] # type: list[_CosaveStr]
 
     def read_mod_names(self, ins, mod_count):
         """Reads a list of mod names with length mod_count from the specified
-        input stream. The result is saved in the mod_names variable.
+        input stream. The result is saved in the _mod_names variable.
 
         :param ins: The input stream to read from.
         :param mod_count: The number of mod names to read."""
         for x in xrange(mod_count):
-            self.mod_names.append(_unpack_cosave_str16(ins))
+            self._mod_names.append(_unpack_cosave_str16(ins))
 
     def write_mod_names(self, out):
         """Writes the saved list of mod names to the specified output stream.
 
         :param out: The output stream to write to."""
-        for mod_name in self.mod_names:
+        for mod_name in self._mod_names:
             _pack_cosave_str16(out, mod_name)
 
     def chunk_length(self):
         # 2 bytes per mod name (for the length)
-        total_len = len(self.mod_names) * 2
-        total_len += sum(imap(len, self.mod_names))
+        total_len = len(self._mod_names) * 2
+        total_len += sum(imap(len, self._mod_names))
         return total_len
 
     def dump_to_log(self, log, save_masters):
-        for mod_name in self.mod_names:
+        for mod_name in self._mod_names:
             log(_(u'    - %s') % mod_name)
 
     def remap_plugins(self, plugin_renames):
-        self.mod_names = [plugin_renames.get(x, x) for x in self.mod_names]
+        self._mod_names = [plugin_renames[x] if x in plugin_renames else x for
+                           x in self._mod_names]
 
 class _xSEChunkARVR(_xSEChunk, _Dumpable):
     """An ARVR (Array Variable) chunk. Only available in OBSE and NVSE. See
@@ -440,7 +441,7 @@ class _xSEChunkARVR(_xSEChunk, _Dumpable):
             log(_(u'   Mod :  %02X (Save File)') % self.mod_index)
         else:
             log(_(u'   Mod :  %02X (%s)') % (
-                self.mod_index, save_masters[self.mod_index].s))
+                self.mod_index, save_masters[self.mod_index]))
         log(_(u'   ID  :  %u') % self.array_id)
         if self.key_type == 1: #Numeric
             if self.is_packed:
@@ -458,7 +459,7 @@ class _xSEChunkARVR(_xSEChunk, _Dumpable):
                     log(_(u'    - %02X (Save File)') % refModID)
                 else:
                     log(u'    - %02X (%s)' % (refModID,
-                                              save_masters[refModID].s))
+                                              save_masters[refModID]))
         log(_(u'   Size:  %u') % len(self.elements))
         for element in self.elements:
             element.dump_to_log(log, save_masters)
@@ -486,14 +487,14 @@ class _xSEChunkDATA(_xSEModListChunk):
             # digits, e.g. '153'.
             num_plugins = int(_unpack_cosave_space_str(ins))
             for x in xrange(num_plugins):
-                self.mod_names.append(_unpack_cosave_space_str(ins))
+                self._mod_names.append(_unpack_cosave_space_str(ins))
         else:
             for x in xrange(256):
                 # This chunk always has 256 mods listed, any excess ones
                 # just get the string 'nomod' stored.
-                read_string = _unpack_cosave_space_str(ins)
-                if read_string.lower() != u'nomod':
-                    self.mod_names.append(read_string)
+                plugin_str = _unpack_cosave_space_str(ins)
+                if plugin_str != u'nomod': # PluginStr compare in lowercase
+                    self._mod_names.append(plugin_str)
         # Treat the remainder as a binary blob, no mod names in there
         read_size = ins.tell() - start_pos
         self.remaining_data = ins.read(self.data_len - read_size)
@@ -503,13 +504,13 @@ class _xSEChunkDATA(_xSEModListChunk):
         # the mods or the mod count (depending on chunk_version)
         total_len = len(self.sos_version) + 1
         if self.chunk_version > 3:
-            total_len += len(self.mod_names) # space separators between mods
+            total_len += len(self._mod_names) # space separators between mods
             # the mod count as a string & space separator between it and mods
-            total_len += len(unicode(len(self.mod_names))) + 1
+            total_len += len(unicode(len(self._mod_names))) + 1
         else:
-            total_len += 256 # space seperators between mods
-            total_len += len(u'nomod') * (256 - len(self.mod_names)) # 'nomod's
-        total_len += sum(imap(len, self.mod_names)) # all present mods
+            total_len += 256 # space separators between mods
+            total_len += len(u'nomod') * (256 - len(self._mod_names)) # 'nomod's
+        total_len += sum(imap(len, self._mod_names)) # all present mods
         return total_len + len(self.remaining_data) # all other data
 
     def write_chunk(self, out):
@@ -517,20 +518,20 @@ class _xSEChunkDATA(_xSEModListChunk):
         _pack_cosave_space_str(out, self.sos_version)
         # Avoid write_mod_names, see reasoning above
         if self.chunk_version > 3:
-            _pack_cosave_space_str(out, unicode(len(self.mod_names)))
-            for mod_name in self.mod_names:
+            _pack_cosave_space_str(out, unicode(len(self._mod_names)))
+            for mod_name in self._mod_names:
                 _pack_cosave_space_str(out, mod_name)
         else:
             # Note that we need to append the 'nomod's we removed during
             # loading here again
-            all_mod_names = self.mod_names + [u'nomod'] * (
-                    256 - len(self.mod_names))
+            all_mod_names = self._mod_names + [_CosaveStr(b'nomod')] * (
+                    256 - len(self._mod_names))
             for mod_name in all_mod_names:
                 _pack_cosave_space_str(out, mod_name)
         out.write(self.remaining_data)
 
     def dump_to_log(self, log, save_masters):
-        log(_(u'   %u loaded mods:') % len(self.mod_names))
+        log(_(u'   %u loaded mods:') % len(self._mod_names))
         super(_xSEChunkDATA, self).dump_to_log(log, save_masters)
 
 class _xSEChunkLIMD(_xSEModListChunk):
@@ -549,14 +550,14 @@ class _xSEChunkLIMD(_xSEModListChunk):
 
     def write_chunk(self, out):
         super(_xSEChunkLIMD, self).write_chunk(out)
-        _pack(out, '=H', len(self.mod_names))
+        _pack(out, '=H', len(self._mod_names))
         self.write_mod_names(out)
 
     def chunk_length(self):
         return 2 + super(_xSEChunkLIMD, self).chunk_length()
 
     def dump_to_log(self, log, save_masters):
-        log(_(u'   %u loaded light mods:') % len(self.mod_names))
+        log(_(u'   %u loaded light mods:') % len(self._mod_names))
         super(_xSEChunkLIMD, self).dump_to_log(log, save_masters)
 
 class _xSEChunkLMOD(_xSEModListChunk):
@@ -573,14 +574,14 @@ class _xSEChunkLMOD(_xSEModListChunk):
 
     def write_chunk(self, out):
         super(_xSEChunkLMOD, self).write_chunk(out)
-        _pack(out, '=B', len(self.mod_names))
+        _pack(out, '=B', len(self._mod_names))
         self.write_mod_names(out)
 
     def chunk_length(self):
         return 1 + super(_xSEChunkLMOD, self).chunk_length()
 
     def dump_to_log(self, log, save_masters):
-        log(_(u'   %u loaded light mods:') % len(self.mod_names))
+        log(_(u'   %u loaded light mods:') % len(self._mod_names))
         super(_xSEChunkLMOD, self).dump_to_log(log, save_masters)
 
 class _xSEChunkMODS(_xSEModListChunk):
@@ -598,14 +599,14 @@ class _xSEChunkMODS(_xSEModListChunk):
 
     def write_chunk(self, out):
         super(_xSEChunkMODS, self).write_chunk(out)
-        _pack(out, '=B', len(self.mod_names))
+        _pack(out, '=B', len(self._mod_names))
         self.write_mod_names(out)
 
     def chunk_length(self):
         return 1 + super(_xSEChunkMODS, self).chunk_length()
 
     def dump_to_log(self, log, save_masters):
-        log(_(u'   %u loaded mods:') % len(self.mod_names))
+        log(_(u'   %u loaded mods:') % len(self._mod_names))
         super(_xSEChunkMODS, self).dump_to_log(log, save_masters)
 
 class _xSEChunkPLGN(_xSEChunk, _Dumpable, _Remappable):
@@ -650,7 +651,8 @@ class _xSEChunkPLGN(_xSEChunk, _Dumpable, _Remappable):
                     self.mod_index, self.light_index, self.mod_name))
 
         def remap_plugins(self, plugin_renames):
-            self.mod_name = plugin_renames.get(self.mod_name, self.mod_name)
+            if self.mod_name not in plugin_renames: return
+            self.mod_name = plugin_renames[self.mod_name]
 
     def __init__(self, ins, chunk_type):
         super(_xSEChunkPLGN, self).__init__(ins, chunk_type)
@@ -701,19 +703,19 @@ class _xSEChunkSTVR(_xSEChunk, _Dumpable):
 
     def dump_to_log(self, log, save_masters):
         log(_(u'   Mod : %02X (%s)') % (self.mod_index,
-                                        save_masters[self.mod_index].s))
+                                        save_masters[self.mod_index]))
         log(_(u'   ID  : %u') % self.string_id)
         log(_(u'   Data: %s') % self.string_data)
 
-# Maps all decoded xSE chunk types to the classes that implement them
+# Maps all inverted xSE chunk signatures to the classes that implement them
 _xse_class_dict = {
-    u'ARVR': _xSEChunkARVR,
-    u'DATA': _xSEChunkDATA,
-    u'LIMD': _xSEChunkLIMD,
-    u'LMOD': _xSEChunkLMOD,
-    u'MODS': _xSEChunkMODS,
-    u'PLGN': _xSEChunkPLGN,
-    u'STVR': _xSEChunkSTVR,
+    b'ARVR': _xSEChunkARVR,
+    b'DATA': _xSEChunkDATA,
+    b'LIMD': _xSEChunkLIMD,
+    b'LMOD': _xSEChunkLMOD,
+    b'MODS': _xSEChunkMODS,
+    b'PLGN': _xSEChunkPLGN,
+    b'STVR': _xSEChunkSTVR,
 }
 
 def _get_xse_chunk(ins):
@@ -726,7 +728,7 @@ def _get_xse_chunk(ins):
     :return: A instance of a matching chunk class, or the generic one if no
         matching class was found."""
     # The chunk type strings are reversed in the cosaves
-    ch_type = _cosave_decode(unpack_4s(ins))[::-1]
+    ch_type = unpack_4s(ins)[::-1]
     ch_class = _xse_class_dict.get(ch_type, _xSEChunk)
     return ch_class(ins, ch_type)
 
@@ -820,8 +822,8 @@ class _PluggyPluginBlock(_PluggyBlock, _Remappable):
             _pack_cosave_str32(out, self.plugin_name)
 
         def remap_plugins(self, plugin_renames):
-            self.plugin_name = plugin_renames.get(self.plugin_name,
-                                                  self.plugin_name)
+            if self.plugin_name not in plugin_renames: return
+            self.plugin_name = plugin_renames[self.plugin_name]
 
         def dump_to_log(self, log, save_masters):
             log(u'    %02X    %02X    %s' % (self.pluggy_id, self.game_id,
@@ -1439,11 +1441,11 @@ class xSECosave(ACosave):
         # The first chunk is either a PLGN chunk (on SKSE64) or a MODS one
         xse_chunks = self._get_xse_plugin().chunks
         first_chunk = xse_chunks[0]
-        if first_chunk.chunk_type == u'PLGN':
+        if first_chunk._chunk_sig == b'PLGN':
             return [mod_entry.mod_name for mod_entry in
                     first_chunk.mod_entries]
-        elif first_chunk.chunk_type == u'MODS':
-            return first_chunk.mod_names
+        elif first_chunk._chunk_sig == b'MODS':
+            return first_chunk._mod_names
         raise FileError(self.abs_path.tail, u'Invalid or unsupported cosave: '
                                             u'First chunk was not PLGN or '
                                             u'MODS chunk.')
@@ -1458,7 +1460,7 @@ class xSECosave(ACosave):
             # is PLGN can we accurately return a master list.
             self.read_cosave(light=True)
             first_ch = self._get_xse_plugin().chunks[0] # type: _xSEChunk
-            return first_ch.chunk_type == u'PLGN'
+            return first_ch._chunk_sig == b'PLGN'
 
     def dump_to_log(self, log, save_masters):
         super(xSECosave, self).dump_to_log(log, save_masters)
@@ -1470,7 +1472,7 @@ class xSECosave(ACosave):
             log(_(u'  Type   Version  Size (in bytes)'))
             log(u'-' * 40)
             for chunk in plugin_chunk.chunks: # type: _xSEChunk
-                log(u'  %4s  %-4u        %u' % (chunk.chunk_type,
+                log(u'  %4s  %-4u        %u' % (_CosaveStr(chunk._chunk_sig),
                                                 chunk.chunk_version,
                                                 chunk.chunk_length()))
                 if isinstance(chunk, _Dumpable):
