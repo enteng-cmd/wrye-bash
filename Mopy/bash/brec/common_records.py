@@ -448,12 +448,3 @@ class MreActorBase(MreWithItems):
         super(MreActorBase, self).mergeFilter(modSet)
         self.spells = [x for x in self.spells if x[0] in modSet]
         self.factions = [x for x in self.factions if x.faction[0] in modSet]
-
-class BipedFlags(bolt.Flags):
-    """Biped flags element. Includes biped flag set by default."""
-    mask = 0xFFFF ##: unused?
-    def __init__(self, flag_default=0, new_flag_names=None):
-        from .. import bush
-        flag_names = bolt.Flags.getNames(*bush.game.Esp.biped_flag_names)
-        if new_flag_names: flag_names.update(new_flag_names)
-        super(BipedFlags, self).__init__(flag_default, flag_names)
