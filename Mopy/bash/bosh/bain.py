@@ -1015,6 +1015,21 @@ class Installer(object):
         (self.underrides,oldUnderrides) = (underrides,self.underrides)
         return self.status != oldStatus or self.underrides != oldUnderrides
 
+    def _gather_from_data(self, data_filter=frozenset()):
+        """Yields tuples containing the full path of files in the Data folder
+        that are either missing or mismatched as the first element, and the
+        relative path inside the installer as the second element.
+
+        :param data_filter: A set of file paths relative to the Data folder
+            that missing or mismatched files must be in to be yielded. If
+            empty (the default), then all file paths will be accepted."""
+        data_dir_join = bass.dirs[u'mods'].join
+        norm_ghost_get = Installer.getGhosted().get
+        for rel_src, rel_dest in self.refreshDataSizeCrc().iteritems():
+            if not data_filter or rel_src in data_filter:
+                yield (data_dir_join(norm_ghost_get(rel_src, rel_src)),
+                       rel_dest)
+
     #--Utility methods --------------------------------------------------------
     def size_or_mtime_changed(self, apath):
         return (self.size, self.modified) != apath.size_mtime()
@@ -1433,23 +1448,14 @@ class InstallerArchive(Installer):
 
     def sync_from_data(self, delta_files):
         # calling 7z once rather than once for each file
-        game_dir_join = bass.dirs[u'mods'].join
-        removed = [game_dir_join(x).s for x in delta_files
-                   if not game_dir_join(x).exists()]
-        updated = [game_dir_join(x).s for x in delta_files
-                   if game_dir_join(x).exists()]
-        del_numb = self._archive_del_files(self.ipath.s, removed)
-        upt_numb = self._archive_upt_files(self.ipath.s, updated)
-        if del_numb != len(removed) or upt_numb != len(updated):
-            balt.showWarning(
-                balt.Link.Frame,
-                _(u'Something went wrong when updating "%s" archive.') %
-                self.archive + u'\n' +
-                _(u'Deleted %s. Expected to delete %s file(s).') % (
-                    del_numb, len(removed)) + u'\n' +
-                _(u'Updated %s. Expected to update %s file(s).') % (
-                    upt_numb, len(updated))  + u'\n' +
-                _(u'Check the integrity of the archive.'))
+        delete_7z, update_7z = [], []
+        for full_data, rel_arch in self._gather_from_data(delta_files):
+            if not full_data.exists():
+                delete_7z.append(rel_arch)
+            else:
+                update_7z.append(rel_arch)
+        del_numb = self._archive_del_files(self.ipath.s, delete_7z)
+        upt_numb = self._archive_upt_files(self.ipath.s, update_7z)
         return upt_numb, del_numb
 
 #------------------------------------------------------------------------------
@@ -1576,26 +1582,19 @@ class InstallerProject(Installer):
                                 None)
 
     def sync_from_data(self, delta_files):
-        srcDir = bass.dirs[u'mods']
-        srcProj = tuple(
-            (x, y) for x, y in self.refreshDataSizeCrc().iteritems() if
-            x in delta_files)
-        if not srcProj: return 0,0
-        #--Sync Files
-        updated = removed = 0
-        norm_ghost = Installer.getGhosted()
-        projDirJoin = self.ipath.join
-        for src,proj in srcProj:
-            srcFull = srcDir.join(norm_ghost.get(src,src))
-            projFull = projDirJoin(proj)
-            if not srcFull.exists():
-                projFull.remove()
-                removed += 1
+        upt_numb = del_numb = 0
+        proj_dir_join = self.ipath.join
+        for full_data, rel_proj in self._gather_from_data(delta_files):
+            full_proj = proj_dir_join(rel_proj)
+            if not full_data.exists():
+                full_proj.remove()
+                del_numb += 1
             else:
-                srcFull.copyTo(projFull)
-                updated += 1
-        self.removeEmpties()
-        return updated,removed
+                full_data.copyTo(full_proj)
+                upt_numb += 1
+        if upt_numb or del_numb:
+            self.removeEmpties()
+        return upt_numb, del_numb
 
     def packToArchive(self,project,archive,isSolid,blockSize,progress=None,release=False):
         """Packs project to build directory. Release filters out development

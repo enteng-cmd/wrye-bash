@@ -1082,20 +1082,6 @@ class Installer_SyncFromData(_SingleInstallable):
                     self._selected_info.mismatchedFiles)
 
     def Execute(self):
-        # For archives, there can only be one version of a changed file.
-        if self._selected_item.cext in (u'.7z',u'.zip'):
-            flist = [GPath(f).stail for f, __, __ in
-                     self._selected_info.fileSizeCrcs]
-            mlist = [GPath(m).stail for m in
-                     (self._selected_info.missingFiles |
-                      self._selected_info.mismatchedFiles)]
-            for m in mlist:  # list of missing or mismatched files
-                if flist.count(m) > 1:
-                    balt.showWarning(balt.Link.Frame,
-                        _(u'The file "%s" has several versions in the archive.'
-                        u' Unable to determine which archive file to update.'
-                        u' This cannot be updated automatically.' % m))
-                    return False
         missing = sorted(self._selected_info.missingFiles)
         mismatched = sorted(self._selected_info.mismatchedFiles)
         msg_del = [_(u'Files to delete (%u):') % len(missing),
@@ -1118,7 +1104,18 @@ class Installer_SyncFromData(_SingleInstallable):
         #--Sync it, baby!
         with balt.Progress(self._text, u'\n' + u' ' * 60) as progress:
             progress(0.1,_(u'Updating files.'))
-            self._selected_info.sync_from_data(sel_missing | sel_mismatched)
+            actual_upd, actual_del = self._selected_info.sync_from_data(
+                sel_missing | sel_mismatched)
+            if (actual_del != len(sel_missing)
+                    or actual_upd != len(sel_mismatched)):
+                self._showWarning(
+                    _(u'Something went wrong when updating "%s" installer.') %
+                    self._selected_info.archive + u'\n' +
+                    _(u'Deleted %s. Expected to delete %s file(s).') % (
+                        actual_del, len(sel_missing)) + u'\n' +
+                    _(u'Updated %s. Expected to update %s file(s).') % (
+                        actual_upd, len(sel_mismatched))  + u'\n' +
+                    _(u'Check the integrity of the installer.'))
             self._selected_info.refreshBasic(SubProgress(progress, 0.1, 0.99))
             self.idata.irefresh(what='NS')
             self.window.RefreshUI()
