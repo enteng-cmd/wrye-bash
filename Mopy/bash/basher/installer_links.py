@@ -1076,12 +1076,17 @@ class Installer_SyncFromData(_SingleInstallable):
 
     def _enable(self):
         if not super(Installer_SyncFromData, self)._enable(): return False
-        #-- 7z can't update rar archives in-place.
-        if self._selected_item.cext == u'.rar': return False
         return bool(self._selected_info.missingFiles or
                     self._selected_info.mismatchedFiles)
 
     def Execute(self):
+        if self._selected_item.cext == u'.rar':
+            if not self._askYes(
+                    _(u'.rar files cannot be modified. Wrye Bash can however '
+                      u'repack them to .7z files, which can then be modified.')
+                    + u'\n\n' + _(u"Click 'Yes' to do that, or 'No' to abort "
+                                  u"the sync.")):
+                return # user clicked 'No'
         missing = sorted(self._selected_info.missingFiles)
         mismatched = sorted(self._selected_info.mismatchedFiles)
         msg_del = [_(u'Files to delete (%u):') % len(missing),

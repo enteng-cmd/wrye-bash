@@ -29,6 +29,7 @@ import copy
 import errno
 import os
 import re
+import subprocess
 import sys
 import time
 from binascii import crc32
@@ -1015,22 +1016,74 @@ class Installer(object):
         (self.underrides,oldUnderrides) = (underrides,self.underrides)
         return self.status != oldStatus or self.underrides != oldUnderrides
 
-    def _gather_from_data(self, data_filter=frozenset()):
-        """Yields tuples containing the full path of files in the Data folder
-        that are either missing or mismatched as the first element, and the
-        relative path inside the installer as the second element.
+    #--Utility methods --------------------------------------------------------
+    def packToArchive(self, project, archive, isSolid, blockSize,
+            progress=None, release=False):
+        """Packs project to build directory. Release filters out development
+        material from the archive. Needed for projects and to repack archives
+        when syncing from Data."""
+        length = len(self.fileSizeCrcs)
+        if not length: return
+        archive, archiveType, solid = compressionSettings(archive, blockSize,
+                                                          isSolid)
+        outDir = bass.dirs[u'installers']
+        realOutFile = outDir.join(archive)
+        outFile = outDir.join(u'bash_temp_nonunicode_name.tmp')
+        num = 0
+        while outFile.exists():
+            outFile += unicode(num)
+            num += 1
+        project = outDir.join(project)
+        with project.unicodeSafe() as projectDir:
+            #--Dump file list
+            with self.tempList.open('w',encoding='utf-8-sig') as out:
+                if release:
+                    out.write(u'*thumbs.db\n')
+                    out.write(u'*desktop.ini\n')
+                    out.write(u'*meta.ini\n')
+                    out.write(u'--*\\')
+            #--Compress
+            command = u'"%s" a "%s" -t"%s" %s -y -r -o"%s" -i!"%s\\*" -x@%s -scsUTF-8 -sccUTF-8' % (
+                archives.exe7z, outFile.temp.s, archiveType, solid, outDir.s, projectDir.s, self.tempList.s)
+            try:
+                compress7z(command, outDir, outFile.tail, projectDir, progress)
+            finally:
+                self.tempList.remove()
+            outFile.moveTo(realOutFile)
 
-        :param data_filter: A set of file paths relative to the Data folder
-            that missing or mismatched files must be in to be yielded. If
-            empty (the default), then all file paths will be accepted."""
+    def removeEmpties(self, target_dir=None):
+        """Removes empty directories from project directory."""
+        if not target_dir:
+            if not self.is_project():
+                raise StateError(u'removeEmpties must be either given a path '
+                                 u'or used on a project.')
+            target_dir = self.ipath.s
+        empties = set()
+        for asDir, sDirs, sFiles in bolt.walkdir(target_dir):
+            if not (sDirs or sFiles): empties.add(GPath(asDir))
+        for empty in empties: empty.removedirs()
+        self.ipath.makedirs() #--In case it just got wiped out.
+
+    def _do_sync_data(self, proj_dir, delta_files, fresh_src_dest):
+        """TODO"""
         data_dir_join = bass.dirs[u'mods'].join
         norm_ghost_get = Installer.getGhosted().get
-        for rel_src, rel_dest in self.refreshDataSizeCrc().iteritems():
-            if not data_filter or rel_src in data_filter:
-                yield (data_dir_join(norm_ghost_get(rel_src, rel_src)),
-                       rel_dest)
+        upt_numb = del_numb = 0
+        proj_dir_join = proj_dir.join
+        for rel_src, rel_dest in fresh_src_dest.iteritems():
+            if rel_src not in delta_files: continue
+            full_src = data_dir_join(norm_ghost_get(rel_src, rel_src))
+            full_dest = proj_dir_join(rel_dest)
+            if not full_dest.exists():
+                full_dest.remove()
+                del_numb += 1
+            else:
+                full_src.copyTo(full_dest)
+                upt_numb += 1
+        if upt_numb or del_numb:
+            self.removeEmpties(proj_dir.s)
+        return upt_numb, del_numb
 
-    #--Utility methods --------------------------------------------------------
     def size_or_mtime_changed(self, apath):
         return (self.size, self.modified) != apath.size_mtime()
 
@@ -1408,54 +1461,20 @@ class InstallerArchive(Installer):
         return self._extract_wizard_files(self.has_fomod_conf,
                                           _(u'Extracting FOMOD files...'))
 
-    def _update_package(self, package, files_affected, action, rtn_phrase):
-        """Update package and return number of files affected.
-
-         :param package: name of package
-         :param files_affected [str]: list of missing or mismatched files
-         :param action: A to update file(s), D to delete file(s)
-         :param rtn_phrase: regex pattern to scan 7z returned text results
-                            to get number of files affected by action """
-        #-- NB: Does not delete any empty folders from game/Data
-        if len(files_affected) == 0: return 0
-        numb_files_changed = 0
-        CREATE_NO_WINDOW = 0x08000000
-        cmd = u'%s %s -r "%s" %s -scsUTF-8' % (archives.exe7z, action,
-              package, u' '.join('"{0}"'.format(x) for x in files_affected))
-        rtn_msg = u''
-        try:
-            rtn_msg = bolt.subprocess.check_output(
-                cmd, creationflags=CREATE_NO_WINDOW)
-        finally:
-            m = re.search(rtn_phrase, rtn_msg)
-            if m:
-                numb_files_changed = int(m.group(1))
-        return numb_files_changed
-
-    def _archive_upt_files(self, archive, files):
-        """Update mismatched files in Archive and return number updated."""
-        # If success: "Add new data to archive: 1 file, 138 bytes (1 KiB)"
-        # u for update doesnt' work. Usa a (to add) instead.
-        # See: https://stackoverflow.com/questions/45770704
-        return self._update_package(archive, files, u'a',
-                                    u'Add new data to archive.+?(\d+) file')
-
-    def _archive_del_files(self, archive, files):
-        """Delete missing files in Archive and return number deleted."""
-        # If success: "Delete data from archive: 1 file, 19 bytes (1 KiB)"
-        return self._update_package(archive, files, u'd',
-                                    u'Delete data from archive.+?(\d+) file')
-
-    def sync_from_data(self, delta_files):
-        # calling 7z once rather than once for each file
-        delete_7z, update_7z = [], []
-        for full_data, rel_arch in self._gather_from_data(delta_files):
-            if not full_data.exists():
-                delete_7z.append(rel_arch)
-            else:
-                update_7z.append(rel_arch)
-        del_numb = self._archive_del_files(self.ipath.s, delete_7z)
-        upt_numb = self._archive_upt_files(self.ipath.s, update_7z)
+    def sync_from_data(self, delta_files): ##: add a progress param?
+        # Extract to a temp project, then perform the sync as if it were a
+        # regular project and finally repack
+        fresh_dest_src = self.refreshDataSizeCrc() # avoid refreshing twice
+        unpack_dir = self.unpackToTemp(fresh_dest_src.keys(), recurse=True)
+        upt_numb, del_numb = self._do_sync_data(
+            unpack_dir, delta_files, fresh_dest_src)
+        archive_name = GPath(self.archive)
+        new_archive = archive_name.root + (
+            archive_name.cext if archive_name.cext != u'.rar'
+            else archives.defaultExt)
+        self.packToArchive(unpack_dir, new_archive, isSolid=True,
+                           blockSize=None)
+        bass.rmTempDir()
         return upt_numb, del_numb
 
 #------------------------------------------------------------------------------
@@ -1546,14 +1565,6 @@ class InstallerProject(Installer):
             mtime = 0
         return self.modified != mtime
 
-    def removeEmpties(self):
-        """Removes empty directories from project directory."""
-        empties = set()
-        for asDir, sDirs, sFiles in bolt.walkdir(self.ipath.s):
-            if not (sDirs or sFiles): empties.add(GPath(asDir))
-        for empty in empties: empty.removedirs()
-        self.ipath.makedirs() #--In case it just got wiped out.
-
     def _refreshSource(self, progress, recalculate_project_crc):
         """Refresh src_sizeCrcDate, fileSizeCrcs, size, modified, crc from
         project directory, set project_refreshed to True."""
@@ -1582,51 +1593,8 @@ class InstallerProject(Installer):
                                 None)
 
     def sync_from_data(self, delta_files):
-        upt_numb = del_numb = 0
-        proj_dir_join = self.ipath.join
-        for full_data, rel_proj in self._gather_from_data(delta_files):
-            full_proj = proj_dir_join(rel_proj)
-            if not full_data.exists():
-                full_proj.remove()
-                del_numb += 1
-            else:
-                full_data.copyTo(full_proj)
-                upt_numb += 1
-        if upt_numb or del_numb:
-            self.removeEmpties()
-        return upt_numb, del_numb
-
-    def packToArchive(self,project,archive,isSolid,blockSize,progress=None,release=False):
-        """Packs project to build directory. Release filters out development
-        material from the archive"""
-        length = len(self.fileSizeCrcs)
-        if not length: return
-        archive, archiveType, solid = compressionSettings(archive, blockSize,
-                                                          isSolid)
-        outDir = bass.dirs[u'installers']
-        realOutFile = outDir.join(archive)
-        outFile = outDir.join(u'bash_temp_nonunicode_name.tmp')
-        num = 0
-        while outFile.exists():
-            outFile += unicode(num)
-            num += 1
-        project = outDir.join(project)
-        with project.unicodeSafe() as projectDir:
-            #--Dump file list
-            with self.tempList.open('w',encoding='utf-8-sig') as out:
-                if release:
-                    out.write(u'*thumbs.db\n')
-                    out.write(u'*desktop.ini\n')
-                    out.write(u'*meta.ini\n')
-                    out.write(u'--*\\')
-            #--Compress
-            command = u'"%s" a "%s" -t"%s" %s -y -r -o"%s" -i!"%s\\*" -x@%s -scsUTF-8 -sccUTF-8' % (
-                archives.exe7z, outFile.temp.s, archiveType, solid, outDir.s, projectDir.s, self.tempList.s)
-            try:
-                compress7z(command, outDir, outFile.tail, projectDir, progress)
-            finally:
-                self.tempList.remove()
-            outFile.moveTo(realOutFile)
+        return self._do_sync_data(self.ipath, delta_files,
+                                  self.refreshDataSizeCrc())
 
     @staticmethod
     def _list_package(apath, log):
