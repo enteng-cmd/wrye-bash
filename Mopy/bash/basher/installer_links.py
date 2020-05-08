@@ -1069,18 +1069,15 @@ class InstallerProject_OmodConfig(_SingleProject):
         InstallerProject_OmodConfigDialog(self.window,
                                           self._selected_item).show_frame()
 #------------------------------------------------------------------------------
-class Installer_SyncFromData(_SingleProject):
+class Installer_SyncFromData(_SingleInstallable):
     """Synchronize an archive or project with files from the Data directory."""
     _text = _(u'Sync from Data')
     _help = _(u'Synchronize an installer with files from the Data directory')
 
     def _enable(self):
+        if not super(Installer_SyncFromData, self)._enable(): return False
         #-- 7z can't update rar archives in-place.
         if self._selected_item.cext == u'.rar': return False
-        #-- Only enable Sync with Data for installed packages.
-        for package, installer in self.idata.items():
-            if package == self._selected_item.stail:
-                if installer.is_active == False: return False
         return bool(self._selected_info.missingFiles or
                     self._selected_info.mismatchedFiles)
 
@@ -1121,7 +1118,7 @@ class Installer_SyncFromData(_SingleProject):
         #--Sync it, baby!
         with balt.Progress(self._text, u'\n' + u' ' * 60) as progress:
             progress(0.1,_(u'Updating files.'))
-            self._selected_info.syncFromData(sel_missing | sel_mismatched)
+            self._selected_info.sync_from_data(sel_missing | sel_mismatched)
             self._selected_info.refreshBasic(SubProgress(progress, 0.1, 0.99))
             self.idata.irefresh(what='NS')
             self.window.RefreshUI()
