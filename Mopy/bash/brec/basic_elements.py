@@ -34,6 +34,8 @@ from ..bolt import struct_pack, PluginStr, ChardetStr
 #------------------------------------------------------------------------------
 class MelObject(object):
     """An empty class used by group and structure elements for data storage."""
+    _repr_attributes = []
+
     def __eq__(self,other):
         """Operator: =="""
         return isinstance(other,MelObject) and self.__dict__ == other.__dict__
@@ -48,13 +50,11 @@ class MelObject(object):
     def __repr__(self):
         """Carefully try to show as much info about ourselves as possible."""
         to_show = []
-        if hasattr(self, u'__slots__'):
-            for obj_attr in self.__slots__:
-                # attrs starting with _ are internal - union types,
-                # distributor states, etc.
-                if not obj_attr.startswith(u'_') and hasattr(self, obj_attr):
-                    to_show.append(
-                        u'%s: %r' % (obj_attr, getattr(self, obj_attr)))
+        for obj_attr in self._repr_attributes:
+            # attrs starting with _ are internal - union types,
+            # distributor states, etc.
+            if not obj_attr.startswith(u'_') and hasattr(self, obj_attr):
+                to_show.append(u'%s: %r' % (obj_attr, getattr(self, obj_attr)))
         return u'<%s>' % u', '.join(sorted(to_show)) # is sorted() needed here?
 
 class AttrsCompare(MelObject):
@@ -512,18 +512,18 @@ class MelGroup(MelSequential):
     def setDefault(self,record):
         record.__setattr__(self.attr,None)
 
-    def getDefault(self):
-        target = MelObject()
+    def getDefault(self, _mel_obj_type=MelObject):
+        target = _mel_obj_type()
         for element in self.elements:
             element.setDefault(target)
+        target._repr_attributes = [s for element in self.elements for s in
+                                   element.getSlotsUsed()]
         return target
 
     def load_data(self, record, ins, sub_type, size_, readId):
         target = record.__getattribute__(self.attr)
         if target is None:
             target = self.getDefault()
-            target.__slots__ = [s for element in self.elements for s in
-                                element.getSlotsUsed()]
             record.__setattr__(self.attr,target)
         self.loaders[sub_type].load_data(target, ins, sub_type, size_, readId)
 
@@ -553,8 +553,6 @@ class MelGroups(MelGroup):
         if sub_type in self._init_sigs:
             # We've hit one of the initial signatures, make a new object
             target = self.getDefault()
-            target.__slots__ = [s for element in self.elements for s in
-                                element.getSlotsUsed()]
             record.__getattribute__(self.attr).append(target)
         else:
             # Add to the existing element

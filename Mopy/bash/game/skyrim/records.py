@@ -436,13 +436,8 @@ class _AVmadComponent(object):
         try:
             return self._component_class()
         except AttributeError:
-            # TODO(inf) This seems to work - what we're currently doing in
-            #  records code, namely reassigning __slots__, does *nothing*:
-            #  https://stackoverflow.com/questions/27907373/dynamically-change-slots-in-python-3
-            #  Fix that by refactoring class creation like this for
-            #  MelBase/MelSet etc.!
             class _MelComponentInstance(MelObject):
-                __slots__ = self.used_slots
+                _repr_attributes = self.used_slots
             self._component_class = _MelComponentInstance # create only once
             return self._component_class()
 

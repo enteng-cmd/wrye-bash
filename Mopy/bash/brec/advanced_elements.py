@@ -384,7 +384,7 @@ class MelArray(MelBase):
         for x in xrange(size_ // entry_size):
             arr_entry = MelObject()
             append_entry(arr_entry)
-            arr_entry.__slots__ = entry_slots
+            arr_entry._repr_attributes = entry_slots
             load_entry(arr_entry, ins, sub_type, entry_size, readId)
 
     def pack_subrecord_data(self, record):

@@ -1722,7 +1722,7 @@ class MreWthr(MelRecord):
                 for x in xrange(size_ // entry_size):
                     arr_entry = MelObject()
                     append_entry(arr_entry)
-                    arr_entry.__slots__ = entry_slots
+                    arr_entry._repr_attributes = entry_slots
                     load_entry(arr_entry, ins, sub_type, entry_size, readId)
             else:
                 _expected_sizes = (self._new_sizes[sub_type],
