@@ -437,7 +437,8 @@ class ModInfo(FileInfo):
 
     def _get_masters(self):
         """Return the plugin masters, in the order listed in its header."""
-        return self.header.masters
+        return [GPath(u'%s' % master, do_normpath=False) for master in
+                self.header.masters]
 
     # Ghosting and ghosting related overrides ---------------------------------
     def do_update(self):
@@ -1054,12 +1055,11 @@ class SaveInfo(FileInfo):
         with self.abs_path.open('rb') as ins:
             with self.abs_path.temp.open('wb') as out:
                 oldMasters = self.header.writeMasters(ins, out)
-        oldMasters = [GPath(decoder(x)) for x in oldMasters]
         self.abs_path.untemp()
         # Cosaves - note that we have to use self.header.masters since in
         # FO4/SSE _get_masters() returns the correct interleaved order, but
         # oldMasters has the 'regular first, then ESLs' order
-        master_map = {x.s: y.s for x, y in zip(oldMasters, self.header.masters)
+        master_map = {x: y for x, y in zip(oldMasters, self.header.get_save_masters())
                       if x != y}
         if master_map:
             for co_file in self._co_saves.values():
@@ -1134,11 +1134,12 @@ class SaveInfo(FileInfo):
             if xse_cosave is not None: # the cached cosave should be valid
                 # Make sure the cosave's masters are actually useful
                 if xse_cosave.has_accurate_master_list(has_esl=True):
-                    return [GPath(master) for master in
-                            xse_cosave.get_master_list()]
+                    return [GPath(u'%s' % master, do_normpath=False) for master
+                            in xse_cosave.get_master_list()]
         # Fall back on the regular masters - either the cosave is unnecessary,
         # doesn't exist or isn't accurate
-        return self.header.masters
+        return [GPath(u'%s' % master, do_normpath=False) for master in
+                self.header.get_save_masters()]
 
     def _reset_masters(self):
         super(SaveInfo, self)._reset_masters()

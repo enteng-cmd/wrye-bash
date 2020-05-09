@@ -25,7 +25,8 @@ import re
 from . import SaveInfo
 from ._saves import SreNPC, SaveFile
 from .. import bush, bolt
-from ..bolt import Flags, encode, sio, Path, struct_pack, struct_unpack
+from ..bolt import Flags, encode, sio, Path, struct_pack, struct_unpack, \
+    PluginStr
 from ..brec import getModIndex, MreRecord, genFid, RecHeader, null2
 from ..exception import SaveFileError, StateError
 from ..mod_files import LoadFactory, MasterMap, ModFile

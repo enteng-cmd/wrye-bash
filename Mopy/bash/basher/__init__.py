@@ -538,7 +538,7 @@ class MasterList(_ModsUIList):
     #--GetMasters
     def GetNewMasters(self):
         """Returns new master list."""
-        return [v.curr_name for k, v in
+        return [v.curr_name.s for k, v in
                 sorted(self.data_store.items(), key=itemgetter(0))]
 
 #------------------------------------------------------------------------------
@@ -1563,7 +1563,7 @@ class ModDetails(_ModsSavesDetails):
         if changeHedr or changeMasters:
             modInfo.header.author = self.authorStr.strip()
             modInfo.header.description = bolt.winNewLines(self.descriptionStr.strip())
-            modInfo.header.masters = self.uilist.GetNewMasters()
+            modInfo.header.set_plugin_masters(self.uilist.GetNewMasters())
             modInfo.header.changed = True
             modInfo.writeHeader()
         #--Change date?
@@ -2130,7 +2130,7 @@ class SaveDetails(_ModsSavesDetails):
                 pass
         #--Change masters?
         if changeMasters:
-            saveInfo.header.masters = self.uilist.GetNewMasters()
+            saveInfo.header.set_save_masters(self.uilist.GetNewMasters())
             saveInfo.write_masters()
             saveInfo.setmtime(prevMTime)
             detail_item = self._refresh_detail_info()

@@ -791,7 +791,8 @@ class _Save_StatCosave(AppendableLink, OneItemLink):
     def Execute(self):
         with BusyCursor(), bolt.sio() as out:
             log = bolt.LogFile(out)
-            self._cosave.dump_to_log(log, self._selected_info.header.masters)
+            self._cosave.dump_to_log(log,
+                self._selected_info.header.get_save_masters())
             text = log.out.getvalue()
         self._showLog(text, title=self._cosave.abs_path.tail.s,
                       fixedFont=False)

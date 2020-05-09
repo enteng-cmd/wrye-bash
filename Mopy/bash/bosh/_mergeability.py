@@ -100,7 +100,7 @@ def isPBashMergeable(modInfo, minfos, reasons):
         if not verbose: return False
         reasons.append(_(u'Empty mod.'))
     #--New record
-    lenMasters = len(modFile.tes4.masters)
+    lenMasters = modFile.tes4.num_masters()
     newblocks = []
     for top_type,block in modFile.tops.iteritems():
         for record in block.iter_records():

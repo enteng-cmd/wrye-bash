@@ -32,7 +32,7 @@ from ..balt import readme_url
 from .. import load_order
 from .. import bass
 from ..brec import MreRecord
-from ..bolt import GPath, SubProgress, deprint, Progress
+from ..bolt import GPath, SubProgress, deprint, Progress, encode
 from ..cint import ObModFile, FormID, dump_record, ObCollection, MGEFCode
 from ..exception import BoltError, CancelError, ModError, StateError
 from ..localize import format_date
@@ -179,7 +179,7 @@ class PatchFile(_PFile, ModFile):
         """Initialization."""
         ModFile.__init__(self,modInfo,None)
         self.tes4.author = u'BASHED PATCH'
-        self.tes4.masters = [bosh.modInfos.masterName]
+        self.tes4.masters = [encode(bosh.modInfos.masterName.s)]
         self.longFids = True
         self.keepIds = set()
         _PFile.__init__(self, modInfo.name)
