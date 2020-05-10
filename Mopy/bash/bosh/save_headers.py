@@ -44,7 +44,7 @@ from .. import bolt
 from ..bolt import decoder, cstrip, unpack_string, unpack_int, unpack_str8, \
     unpack_short, unpack_float, unpack_str16, unpack_byte, struct_pack, \
     unpack_str_int_delim, unpack_str16_delim_null, unpack_str_byte_delim, \
-    unpack_many, encode, PluginStr
+    unpack_many, encode, PluginStr, ChardetStr
 from ..exception import SaveHeaderError, raise_bolt_error
 
 class _SaveMasterStr(PluginStr): pass
@@ -87,9 +87,8 @@ class SaveFileHeader(object):
         self.load_masters(ins)
         # additional calculations - TODO(ut): rework decoding
         self.calc_time()
-        self.pcName = decoder(cstrip(self.pcName))
-        self.pcLocation = decoder(cstrip(self.pcLocation), bolt.pluginEncoding,
-                                  avoidEncodings=(u'utf8', u'utf-8'))
+        self.pcName = ChardetStr(self.pcName)
+        self.pcLocation = PluginStr(self.pcLocation)
 
     def load_image_data(self, ins):
         self.ssData = ins.read(3 * self.ssWidth * self.ssHeight)
@@ -536,11 +535,9 @@ class MorrowindSaveHeader(SaveFileHeader):
         save_info = ModInfo(self._save_path, load_cache=True)
         ##: Figure out where some more of these are (e.g. level)
         self.header_size = save_info.header.size
-        self.pcName = decoder(cstrip(save_info.header.pc_name))
+        self.pcName = ChardetStr(save_info.header.pc_name)
         self.pcLevel = 0
-        self.pcLocation = decoder(cstrip(save_info.header.curr_cell),
-                                  bolt.pluginEncoding,
-                                  avoidEncodings=(u'utf8', u'utf-8'))
+        self.pcLocation = PluginStr(save_info.header.curr_cell)
         self.gameDays = self.gameTicks = 0
         self.set_save_masters(save_info.masterNames) ## FIXME test, needed?
         self.pc_curr_health = save_info.header.pc_curr_health

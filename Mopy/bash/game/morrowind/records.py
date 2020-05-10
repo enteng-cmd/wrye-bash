@@ -24,18 +24,11 @@
 """This module contains the Morrowind record classes. Also contains records
 and subrecords used for the saves - see MorrowindSaveHeader for more
 information."""
-from ... import bolt
-from ...bolt import cstrip, decoder
+from ...bolt import ChardetStr, pluginEncoding
 from ...brec import MelBase, MelSet, MelString, MelStruct, MelArray, \
     MreHeaderBase, MelUnion, SaveDecider, MelNull, MelSequential
 
 # Utilities
-def _decode_raw(target_str):
-    """Adapted from MelUnicode.load_data. ##: maybe move to bolt/brec?"""
-    return u'\n'.join(
-        decoder(x, avoidEncodings=(u'utf8', u'utf-8')) for x
-        in cstrip(target_str).split(b'\n'))
-
 class MelSavesOnly(MelSequential):
     """Record element that only loads contents if the input file is a save
     file."""
@@ -63,18 +56,18 @@ class MreTes3(MreHeaderBase):
             super(MreTes3.MelTes3Hedr, self).load_data(record, ins, sub_type,
                                                        size_, readId)
             # Strip off the null bytes and convert to unicode
-            record.author = _decode_raw(record.author)
-            record.description = _decode_raw(record.description)
+            record.author = ChardetStr(record.author)
+            record.description = ChardetStr(record.description)
 
         def dumpData(self, record, out):
             # Store the original values in case we dump more than once
             orig_author = record.author
             orig_desc = record.description
             # Encode and enforce limits, then dump out
-            record.author = bolt.encode_complex_string(
-                record.author, max_size=32, min_size=32)
-            record.description = bolt.encode_complex_string(
-                record.description, max_size=256, min_size=256)
+            record.author = orig_author.reencode(pluginEncoding,
+                max_size=32, min_size=32)
+            record.description = orig_desc.reencode(pluginEncoding,
+                max_size=256, min_size=256)
             super(MreTes3.MelTes3Hedr, self).dumpData(record, out)
             # Restore the original values again, see comment above
             record.author = orig_author

@@ -797,7 +797,7 @@ class ModList(_ModsUIList):
     def _get(self, mod): return partial(self.data_store.table.getItem, mod)
     _sort_keys = {
         'File'      : None,
-        'Author'    : lambda self, a: self.data_store[a].header.author.lower(),
+        'Author'    : lambda self, a: self.data_store[a].header.author,
         'Rating'    : lambda self, a: self._get(a)('rating', u''),
         'Group'     : lambda self, a: self._get(a)('group', u''),
         'Installer' : lambda self, a: self._get(a)('installer', u''),
@@ -1424,9 +1424,9 @@ class ModDetails(_ModsSavesDetails):
             modInfo = self.modInfo = bosh.modInfos[fileName]
             #--Remember values for edit checks
             self.fileStr = modInfo.name.s
-            self.authorStr = modInfo.header.author
+            self.authorStr = u'%s' % modInfo.header.author
             self.modifiedStr = format_date(modInfo.mtime)
-            self.descriptionStr = modInfo.header.description
+            self.descriptionStr = u'%s' % modInfo.header.description
             self.versionStr = u'v%0.2f' % modInfo.header.version
             tagsStr = u'\n'.join(sorted(modInfo.getBashTags()))
         else: tagsStr = u''
