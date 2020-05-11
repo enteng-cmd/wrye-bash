@@ -1368,10 +1368,10 @@ class ImportInventory(_AImportInventory, ImportPatcher):
         p_sources = [x for x in p_sources if
                      x in p_file.p_file_minfos and x in p_file.allSet]
         super(ImportInventory, self).__init__(p_name, p_file, p_sources)
-        self.masters = set(chain.from_iterable(
+        self._invent_masters = set(chain.from_iterable(
             self._recurse_masters(srcMod, p_file.p_file_minfos)
             for srcMod in self.srcs))
-        self._masters_and_srcs = self.masters | set(self.srcs)
+        self._masters_and_srcs = self._invent_masters | set(self.srcs)
         self.mod_id_entries = {}
         self.touched = set()
 
@@ -1431,7 +1431,7 @@ class ImportInventory(_AImportInventory, ImportPatcher):
             can_change = u'Invent.Change' in applied_tags
             can_remove = u'Invent.Remove' in applied_tags
             id_entries = {}
-            for master in modFile.tes4.masters:
+            for master in modFile.get_masters():
                 if master in mod_id_entries:
                     id_entries.update(mod_id_entries[master])
             for fid,entries in mod_id_entries[modName].iteritems():

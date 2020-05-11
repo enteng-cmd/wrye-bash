@@ -887,7 +887,7 @@ class Save_UpdateNPCLevels(EnabledLink):
                     continue
                 if 'NPC_' not in modFile.tops: continue
                 #--Loop over mod NPCs
-                mapToOrdered = MasterMap(modFile.tes4.masters + [modName],
+                mapToOrdered = MasterMap(modFile.get_masters() + [modName],
                                          ordered)
                 for npc in modFile.NPC_.getActiveRecords():
                     fid = mapToOrdered(npc.fid,None)

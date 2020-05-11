@@ -401,7 +401,7 @@ class PCFaces(object):
         faces = {}
         for npc in modFile.NPC_.getActiveRecords():
             face = PCFaces.PCFace()
-            face.face_masters = modFile.tes4.masters + [modInfo.name]
+            face.face_masters = modFile.get_masters() + [modInfo.name]
             for field in ('eid','race','eye','hair','hairLength',
                           'hairRed','hairBlue','hairGreen','unused3',
                           'fggs_p','fgga_p','fgts_p','level','skills',
@@ -444,9 +444,11 @@ class PCFaces(object):
         if not tes4.description:
             tes4.description = _(u'Face dump from save game.')
         from . import modInfos ##: put it here so I know it's initialized...
-        if modInfos.masterName not in tes4.masters:
-            tes4.masters.append(modInfos.masterName)
-        masterMap = MasterMap(face.face_masters,tes4.masters+[modInfo.name])
+        tes4_masters = modFile.get_masters()
+        if modInfos.masterName not in tes4_masters: # FIXME append?
+            tes4.masters.append(PluginStr(modInfos.masterName.s.encode(u'cp1252')))
+        masterMap = MasterMap(face.face_masters,
+            modFile.get_masters() + [modInfo.name])
         #--Eid
         npcEids = set([record.eid for record in modFile.NPC_.records])
         eidForm = u''.join((u"sg", bush.game.raceShortNames.get(face.race,u'Unk'),

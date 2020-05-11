@@ -1533,7 +1533,7 @@ class Mod_DecompileAll(EnabledLink):
             id_text = {}
             if modFile.SCPT.getNumRecords(False):
                 loadFactory = mod_files.LoadFactory(False, MreRecord.type_class['SCPT'])
-                for master in modFile.tes4.masters:
+                for master in modFile.get_masters():
                     masterFile = mod_files.ModFile(bosh.modInfos[master], loadFactory)
                     masterFile.load(True)
                     mapper = masterFile.getLongMapper()

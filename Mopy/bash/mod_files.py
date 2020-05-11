@@ -166,6 +166,9 @@ class ModFile(object):
         self.topsSkipped = set() #--Types skipped
         self.longFids = False
 
+    def get_masters(self): # TODO: cache?
+        return [GPath(u'%s' % x, do_normpath=False) for x in self.tes4.masters]
+
     def __getattr__(self, topType, __rh=RecordHeader):
         """Returns top block of specified topType, creating it, if necessary."""
         if topType in self.tops:
@@ -286,22 +289,22 @@ class ModFile(object):
 
     def getLongMapper(self):
         """Returns a mapping function to map short fids to long fids."""
-        masters = self.tes4.masters+[self.fileInfo.name]
-        maxMaster = len(masters)-1
+        masters_list = self.get_masters() + [self.fileInfo.name]
+        maxMaster = len(masters_list)-1
         def mapper(fid):
             if fid is None: return None
             if isinstance(fid,tuple): return fid
             mod,object = int(fid >> 24),int(fid & 0xFFFFFF)
-            return masters[min(mod,maxMaster)],object
+            return masters_list[min(mod,maxMaster)],object
         return mapper
 
     def getShortMapper(self):
         """Returns a mapping function to map long fids to short fids."""
-        masters = self.tes4.masters + [self.fileInfo.name]
-        indices = {name: index for index, name in enumerate(masters)}
+        masters_list = self.get_masters() + [self.fileInfo.name]
+        indices = {name: index for index, name in enumerate(masters_list)}
         gLong = self.getLongMapper()
         has_expanded_range = bush.game.Esp.expanded_plugin_range
-        if has_expanded_range and len(masters) > 1:
+        if has_expanded_range and len(masters_list) > 1:
             # Plugin has at least one master, it may freely use the
             # expanded (0x000-0x800) range
             def _master_index(m_name, obj_id):

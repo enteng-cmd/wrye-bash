@@ -179,7 +179,7 @@ class PatchFile(_PFile, ModFile):
         """Initialization."""
         ModFile.__init__(self,modInfo,None)
         self.tes4.author = u'BASHED PATCH'
-        self.tes4.masters = [encode(bosh.modInfos.masterName.s)]
+        self.tes4.set_plugin_masters([encode(bosh.modInfos.masterName.s)])
         self.longFids = True
         self.keepIds = set()
         _PFile.__init__(self, modInfo.name)
@@ -296,7 +296,7 @@ class PatchFile(_PFile, ModFile):
             block.keepRecords(self.keepIds)
         progress(0.95,_(u'Completing')+u'\n'+_(u'Converting fids...'))
         # Convert masters to short fids
-        self.tes4.masters = self.getMastersUsed()
+        self.tes4.set_plugin_masters(self.getMastersUsed())
         self.convertToShortFids()
         progress(1.0,_(u"Compiled."))
         # Build the description

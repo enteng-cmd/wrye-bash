@@ -317,7 +317,7 @@ class _PBashParser(_AParser):
                         self._read_record_fp(record)
             self._fp_mods.add(mod_to_read.fileInfo.name)
         # Process the mod's masters first, but see if we need to sort them
-        master_names = loaded_mod.tes4.masters
+        master_names = loaded_mod.get_masters()
         if self._needs_fp_master_sort:
             master_names = load_order.get_ordered(master_names)
         for mod_name in master_names:
@@ -1350,11 +1350,11 @@ class FidReplacer(object):
         modFile.load(True)
         #--Create  filtered versions of mappers.
         mapper = modFile.getShortMapper()
-        masters = modFile.tes4.masters + [modFile.fileInfo.name]
+        masters_list = modFile.get_masters() + [modFile.fileInfo.name]
         short = dict((oldId,mapper(oldId)) for oldId in self.old_eid if
-                     oldId[0] in masters)
+                     oldId[0] in masters_list)
         short.update((newId,mapper(newId)) for newId in self.new_eid if
-                     newId[0] in masters)
+                     newId[0] in masters_list)
         old_eid = dict(
             (short[oldId],eid) for oldId,eid in self.old_eid.iteritems() if
             oldId in short)
