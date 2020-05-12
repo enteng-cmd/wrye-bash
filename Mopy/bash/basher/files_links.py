@@ -196,14 +196,14 @@ class File_Snapshot(ItemLink):
             snapVersion = bolt.getMatch(
                 re.search(u'' r'-[\d.]+$', destRoot.s, re.U))
             fileHedr = fileInfo.header
-            if fileInfo.isMod() and (fileVersion or snapVersion) and bosh.reVersion.search(fileHedr.description):
+            if fileInfo.isMod() and (fileVersion or snapVersion) and bosh.reVersion.search(u'%s' % fileHedr.description):
                 if fileVersion and snapVersion:
                     newVersion = fileVersion+snapVersion
                 elif snapVersion:
                     newVersion = snapVersion[1:]
                 else:
                     newVersion = fileVersion
-                newDescription = bosh.reVersion.sub(u'\\1 '+newVersion, fileHedr.description,1)
+                newDescription = bosh.reVersion.sub(u'\\1 '+newVersion, u'%s' % fileHedr.description,1)
                 fileInfo.writeDescription(newDescription)
                 self.window.panel.SetDetails(fileName)
             #--Copy file

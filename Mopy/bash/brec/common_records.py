@@ -108,6 +108,11 @@ class MreHeaderBase(MelRecord):
             raise SyntaxError(u'new_author param must be bytes: %r' % new_author)
         self.author = _CaseSensitiveStr(new_author)
 
+    def set_mod_desc(self, new_desc):
+        if isinstance(new_desc, unicode):
+            new_desc = encode(new_desc)
+        self.description = _CaseSensitiveStr(new_desc)
+
     def loadData(self, ins, endPos):
         super(MreHeaderBase, self).loadData(ins, endPos)
         num_masters = len(self.masters)

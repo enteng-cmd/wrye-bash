@@ -442,7 +442,7 @@ class PCFaces(object):
         if not tes4.author:
             tes4.set_mod_author(b'[wb]')
         if not tes4.description:
-            tes4.description = _(u'Face dump from save game.')
+            tes4.set_mod_desc( (_(u'Face dump from save game.')) )
         from . import modInfos ##: put it here so I know it's initialized...
         tes4_masters = modFile.get_masters()
         if modInfos.masterName not in tes4_masters: # FIXME append?

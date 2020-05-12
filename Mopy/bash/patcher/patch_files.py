@@ -310,7 +310,7 @@ class PatchFile(_PFile, ModFile):
             self.tes4.flags1.eslFile = True
             desc += u'\nThis patch has been automatically ESL-flagged to ' \
                     u'save a load order slot.'
-        self.tes4.description = desc
+        self.tes4.description = desc # FIXME
 
 class CBash_PatchFile(_PFile, ObModFile):
     """Defines and executes patcher configuration."""
