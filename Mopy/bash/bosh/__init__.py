@@ -49,7 +49,8 @@ from .. import bass, bolt, balt, bush, env, load_order, archives, \
 from .. import patcher # for configIsCBash()
 from ..archives import readExts
 from ..bass import dirs, inisettings, tooldirs
-from ..bolt import GPath, DataDict, deprint, sio, Path, decoder, AFile
+from ..bolt import GPath, DataDict, deprint, sio, Path, decoder, AFile, \
+    PluginStr
 from ..brec import ModReader, RecordHeader
 from ..cint import CBashApi
 from ..exception import AbstractError, ArgumentError, BoltError, BSAError, \
@@ -169,13 +170,27 @@ class FileInfo(AFile):
         self.madeBackup = False
         # True if the masters for this file are not reliable
         self.has_inaccurate_masters = False
+        # True if has a master with un unencodable name in cp1252
+        self.has_unicode_masters = False
         #--Ancillary storage
         self.extras = {}
         super(FileInfo, self).__init__(g_path, load_cache)
 
-    def _reset_masters(self):
+    def _reset_masters(self, good_encodings=frozenset((u'ascii', u'cp1252'))): # TODO other "good" ones?
         #--Master Names/Order
-        self.masterNames = tuple(self._get_masters())
+        masters_bytestrings = self._get_masters() # type: list[PluginStr]
+        # decode the strings, setting their preferred_encoding to the one used
+        self.masterNames = tuple(
+            GPath(u'%s' % x, do_normpath=False) for x in masters_bytestrings)
+        try:
+            for x in masters_bytestrings:
+                if x.preferred_encoding not in good_encodings:
+                    # we fell back  to some other encoding to decode - check if
+                    # it's encodable in cp1252 # TODO: will mangle it probably
+                    x._decoded.encode('cp1252')
+            self.has_unicode_masters = False
+        except UnicodeEncodeError:
+            self.has_unicode_masters = True
         self.masterOrder = tuple() #--Reset to empty for now
 
     def _file_changed(self, stat_tuple):
@@ -436,8 +451,7 @@ class ModInfo(FileInfo):
 
     def _get_masters(self):
         """Return the plugin masters, in the order listed in its header."""
-        return [GPath(u'%s' % x, do_normpath=False) for x in
-                self.header.masters]
+        return self.header.masters
 
     # Ghosting and ghosting related overrides ---------------------------------
     def do_update(self):
@@ -616,14 +630,6 @@ class ModInfo(FileInfo):
     def hasActiveTimeConflict(self):
         """True if has an active mtime conflict with another mod."""
         return load_order.has_load_order_conflict_active(self.name)
-
-    def hasBadMasterNames(self): # used in status calculation
-        """True if has a master with un unencodable name in cp1252."""
-        try:
-            for x in self.masterNames: x.s.encode('cp1252')
-            return False
-        except UnicodeEncodeError:
-            return True
 
     @property
     def _modname(self):
@@ -1133,12 +1139,10 @@ class SaveInfo(FileInfo):
             if xse_cosave is not None: # the cached cosave should be valid
                 # Make sure the cosave's masters are actually useful
                 if xse_cosave.has_accurate_master_list(has_esl=True):
-                    return [GPath(u'%s' % master, do_normpath=False) for master
-                            in xse_cosave.get_master_list()]
+                    return xse_cosave.get_master_list()
         # Fall back on the regular masters - either the cosave is unnecessary,
         # doesn't exist or isn't accurate
-        return [GPath(u'%s' % master, do_normpath=False) for master in
-                self.header.get_save_masters()]
+        return self.header.get_save_masters()
 
     def _reset_masters(self):
         super(SaveInfo, self)._reset_masters()
@@ -2388,7 +2392,7 @@ class ModInfos(FileInfos):
             if _modSet is None: _modSet = set(self.keys())
             #--Check for bad masternames:
             #  Disabled for now
-            ##if self[fileName].hasBadMasterNames():
+            ##if self[fileName].has_unicode_masters:
             ##    return
             # Speed up lookups, since they occur for the plugin and all masters
             acti_set = set(self._active_wip)

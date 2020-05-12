@@ -301,17 +301,20 @@ class PluginStr(bytes):
 
     @property
     def preferred_encoding(self):
-        return self.__class__._preferred_encoding or pluginEncoding
+        return self._preferred_encoding or pluginEncoding
 
     @property
     def _decoded(self):
+        """Keep the encoding used by the decoder - if self.preferred_encoding
+        is None or decoder failed with it it will fallback to chardet."""
         try:
             return self._decoded_str
         except AttributeError:
             # it may happen to have more that one null terminator
             byte_str = self.rstrip(b'\x00')
-            self._decoded_str = decoder(byte_str, self.preferred_encoding,
-                avoidEncodings=self._avoid_encodings)
+            self._decoded_str, self._preferred_encoding = decoder(byte_str,
+                self.preferred_encoding, avoidEncodings=self._avoid_encodings,
+                returnEncoding=True)
             return self._decoded_str
 
     @property
@@ -384,19 +387,6 @@ class ChardetStr(PluginStr):
     @property
     def preferred_encoding(self):
         return self._preferred_encoding # None == automatic detection
-
-    @property
-    def _decoded(self):
-        """Keep the encoding returned by automatic detection."""
-        try:
-            return self._decoded_str
-        except AttributeError:
-            # it may happen to have more that one null terminator
-            byte_str = self.rstrip(b'\x00')
-            self._decoded_str, self._preferred_encoding = decoder(byte_str,
-                self.preferred_encoding, avoidEncodings=(u'utf8', u'utf-8'),
-                returnEncoding=True)
-            return self._decoded_str
 
 def _ci_str(maybe_str):
     """dict keys can be any hashable object - only call CIstr if str"""
