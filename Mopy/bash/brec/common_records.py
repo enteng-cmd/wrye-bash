@@ -32,8 +32,8 @@ from operator import attrgetter
 from .advanced_elements import AttrExistsDecider, AttrValDecider, MelArray, \
     MelUnion
 from .basic_elements import MelBase, MelFid, MelFids, MelFloat, MelGroups, \
-    MelLString, MelNull, MelStruct, MelUInt32, MelSInt32, MelUnicode, MelGroup, \
-    MelObject, AttrsCompare
+    MelLString, MelNull, MelStruct, MelUInt32, MelSInt32, MelGroup, \
+    AttrsCompare, MelString
 from .common_subrecords import MelEdid
 from .mod_io import RecordHeader, GrupHeader
 from .record_structs import MelRecord, MelSet, MreRecord
@@ -43,6 +43,13 @@ from ..bolt import decoder, struct_pack, ChardetStr, encode
 from ..exception import StateError
 
 #------------------------------------------------------------------------------
+class _CaseSensitiveStr(ChardetStr):
+    _ci_comparison = False
+class _MelChardet(MelString):
+    """Falls back to chardet to decode the string and compares case
+    sensitive. **Only** use for MelAuth and MelDesc."""
+    _wrapper_bytes_type = _CaseSensitiveStr
+
 class MreHeaderBase(MelRecord):
     """File header.  Base class for all 'TES4' like records"""
     class MelMasterNames(MelBase):
@@ -81,10 +88,25 @@ class MreHeaderBase(MelRecord):
                     num_masters - num_sizes)
             for master_name, master_size in zip(record.masters,
                                                 record.master_sizes):
-                MelUnicode(b'MAST', '').packSub(out, master_name,
+                _MelChardet(b'MAST', '').packSub(out, master_name,
                     force_encoding=u'cp1252')
                 MelBase(b'DATA', '').packSub(
                     out, struct_pack(u'Q', master_size))
+
+    class MelAuthor(_MelChardet):
+        def __init__(self):
+            super(MreHeaderBase.MelAuthor, self).__init__(b'CNAM', u'author',
+                ChardetStr(b''), 512)
+
+    class MelDescription(_MelChardet):
+        def __init__(self):
+            super(MreHeaderBase.MelDescription, self).__init__(b'SNAM',
+                u'description', ChardetStr(b''), 512)
+
+    def set_mod_author(self, new_author):
+        if isinstance(new_author, unicode):
+            raise SyntaxError(u'new_author param must be bytes: %r' % new_author)
+        self.author = _CaseSensitiveStr(new_author)
 
     def loadData(self, ins, endPos):
         super(MreHeaderBase, self).loadData(ins, endPos)

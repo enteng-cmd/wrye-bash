@@ -49,9 +49,8 @@ from .. import bass, bolt, balt, bush, env, load_order, archives, \
 from .. import patcher # for configIsCBash()
 from ..archives import readExts
 from ..bass import dirs, inisettings, tooldirs
-from ..bolt import GPath, DataDict, deprint, sio, Path, decoder, struct_pack, \
-    struct_unpack, AFile
-from ..brec import MreRecord, ModReader, RecordHeader
+from ..bolt import GPath, DataDict, deprint, sio, Path, decoder, AFile
+from ..brec import ModReader, RecordHeader
 from ..cint import CBashApi
 from ..exception import AbstractError, ArgumentError, BoltError, BSAError, \
     CancelError, FileError, ModError, PluginsFullError, SaveFileError, \
@@ -437,7 +436,7 @@ class ModInfo(FileInfo):
 
     def _get_masters(self):
         """Return the plugin masters, in the order listed in its header."""
-        return [GPath(u'%s' % master, do_normpath=False) for master in
+        return [GPath(u'%s' % x, do_normpath=False) for x in
                 self.header.masters]
 
     # Ghosting and ghosting related overrides ---------------------------------
@@ -2524,9 +2523,9 @@ class ModInfos(FileInfos):
         newInfo = self.factory(directory.join(new_name))
         newFile = ModFile(newInfo)
         if not masterless:
-            newFile.tes4.masters = [self.masterName]
+            newFile.tes4.masters = [self.masterName] # FIXME assigning to masters
         if bashed_patch:
-            newFile.tes4.author = u'BASHED PATCH'
+            newFile.tes4.set_mod_author(b'BASHED PATCH')
         newFile.safeSave()
         if directory == self.store_dir:
             self.new_info(new_name, notify_bain=True) # notify just in case...
@@ -2649,9 +2648,9 @@ class ModInfos(FileInfos):
     def get_hide_dir(self, name):
         dest_dir =self.hidden_dir
         #--Use author subdirectory instead?
-        mod_author = self[name].header.author
-        if mod_author:
-            authorDir = dest_dir.join(mod_author)
+        mod_author_str = self[name].header.author
+        if mod_author_str:
+            authorDir = dest_dir.join(u'%s' % mod_author_str)
             if authorDir.isdir():
                 return authorDir
         #--Use group subdirectory instead?

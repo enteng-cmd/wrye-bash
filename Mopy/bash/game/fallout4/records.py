@@ -25,7 +25,7 @@
 imported from skyrim, but only after setting MelModel to the FO4 format."""
 from ... import brec
 from ...brec import MelBase, MelGroup, MreHeaderBase, MelSet, MelString, \
-    MelStruct, MelUnicode, MelNull, MelFidList, MreLeveledListBase, MelFid, \
+    MelStruct, MelNull, MelFidList, MreLeveledListBase, MelFid, \
     FID, MelLString, MelUInt8, MelOptFid, MelOptFloat, MelBounds, MelEdid, \
     MelArray, MelModelCompare
 # Set brec.MelModel to the Fallout 4 one - do not import from skyrim.records yet
@@ -74,8 +74,8 @@ class MreTes4(MreHeaderBase):
         MelStruct('HEDR', 'f2I', ('version', 1.0), 'numRecords',
                   ('nextObject', 0x800)),
         MelBase('TNAM', 'tnam_p'),
-        MelUnicode('CNAM','author',u'',512),
-        MelUnicode('SNAM','description',u'',512),
+        MreHeaderBase.MelAuthor(),
+        MreHeaderBase.MelDescription(),
         MreHeaderBase.MelMasterNames(),
         MelFidList('ONAM','overrides',),
         MelBase('SCRN', 'screenshot'),

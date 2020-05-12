@@ -29,7 +29,7 @@ import struct
 
 from .utils_constants import FID, null1, _make_hashable, _int_unpacker
 from .. import bolt, exception
-from ..bolt import struct_pack, PluginStr, ChardetStr
+from ..bolt import struct_pack, PluginStr
 
 #------------------------------------------------------------------------------
 class MelObject(object):
@@ -602,21 +602,6 @@ class MelString(MelBase):
         super(MelString, self)._dump_bytes(out, byte_string,
             lenData + 1) # add the len of null terminator
         out.write(null1) # then write it out
-
-#------------------------------------------------------------------------------
-class MelUnicode(MelString):
-    """Like MelString, but instead of using bolt.pluginEncoding to read the
-       string, it tries the encoding specified in the constructor instead or
-       falls back to chardet. **Only** use for MreHeaderBase author and
-       description fields."""
-    _wrapper_bytes_type = ChardetStr
-
-    def __init__(self, mel_sig, attr, default=None, maxSize=0, encoding=None):
-        MelString.__init__(self, mel_sig, attr, default, maxSize)
-        if encoding is not None: # None == automatic detection via ChardetStr
-            class _PluginStr(PluginStr):
-                _preferred_encoding = encoding
-            self._wrapper_bytes_type = _PluginStr
 
 #------------------------------------------------------------------------------
 class MelLString(MelString):

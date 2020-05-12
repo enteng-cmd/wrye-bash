@@ -178,7 +178,7 @@ class PatchFile(_PFile, ModFile):
     def __init__(self, modInfo):
         """Initialization."""
         ModFile.__init__(self,modInfo,None)
-        self.tes4.author = u'BASHED PATCH'
+        self.tes4.set_mod_author(b'BASHED PATCH')
         self.tes4.set_plugin_masters([encode(bosh.modInfos.masterName.s)])
         self.longFids = True
         self.keepIds = set()
@@ -301,17 +301,16 @@ class PatchFile(_PFile, ModFile):
         progress(1.0,_(u"Compiled."))
         # Build the description
         numRecords = sum([x.getNumRecords(False) for x in self.tops.values()])
-        self.tes4.description = (
-                _(u'Updated: ') + format_date(time.time()) + u'\n\n' + _(
+        desc = (_(u'Updated: ') + format_date(time.time()) + u'\n\n' + _(
                 u'Records Changed: %d') % numRecords)
         # Flag as ESL if the game supports them and the option is enabled
         # Note that we can always safely mark as ESL, since the BP only ever
         # contains overrides, no new records
         if bush.game.has_esl and bass.settings['bash.mods.auto_flag_esl']:
             self.tes4.flags1.eslFile = True
-            self.tes4.description += (u'\nThis patch has been automatically '
-                                      u'ESL-flagged to save a load order '
-                                      u'slot.')
+            desc += u'\nThis patch has been automatically ESL-flagged to ' \
+                    u'save a load order slot.'
+        self.tes4.description = desc
 
 class CBash_PatchFile(_PFile, ObModFile):
     """Defines and executes patcher configuration."""
@@ -429,7 +428,7 @@ class CBash_PatchFile(_PFile, ObModFile):
             raise StateError()
         ObModFile.__init__(self, patchFile._ModID)
 
-        self.TES4.author = u'BASHED PATCH'
+        self.TES4.author = u'BASHED PATCH' # CBash author
 
         #With this indexing, MGEFs may be looped through twice if another patcher also looks through MGEFs
         #It's inefficient, but it really shouldn't be a problem since there are so few MGEFs.

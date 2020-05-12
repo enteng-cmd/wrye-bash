@@ -1561,7 +1561,7 @@ class ModDetails(_ModsSavesDetails):
                 pass
         #--Change hedr/masters?
         if changeHedr or changeMasters:
-            modInfo.header.author = self.authorStr.strip()
+            modInfo.header.set_mod_author(self.authorStr.strip())
             modInfo.header.description = bolt.winNewLines(self.descriptionStr.strip())
             modInfo.header.set_plugin_masters(self.uilist.GetNewMasters())
             modInfo.header.changed = True

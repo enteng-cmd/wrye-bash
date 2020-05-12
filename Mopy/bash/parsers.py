@@ -108,6 +108,7 @@ class _AParser(object):
             self._current_mod].getBashTags()
 
     def _load_plugin(self, mod_info, target_types):
+        # type: (bosh.ModInfos, list[str]) -> ModFile
         """Loads the specified record types in the specified ModInfo and
         returns the result. Abstract because it may be implemented by either
         PBash or CBash.

@@ -41,7 +41,7 @@ import zlib
 from collections import OrderedDict
 from functools import partial
 from .. import bolt
-from ..bolt import decoder, cstrip, unpack_string, unpack_int, unpack_str8, \
+from ..bolt import unpack_string, unpack_int, unpack_str8, \
     unpack_short, unpack_float, unpack_str16, unpack_byte, struct_pack, \
     unpack_str_int_delim, unpack_str16_delim_null, unpack_str_byte_delim, \
     unpack_many, encode, PluginStr, ChardetStr
@@ -539,7 +539,7 @@ class MorrowindSaveHeader(SaveFileHeader):
         self.pcLevel = 0
         self.pcLocation = PluginStr(save_info.header.curr_cell)
         self.gameDays = self.gameTicks = 0
-        self.set_save_masters(save_info.masterNames) ## FIXME test, needed?
+        self._save_masters = save_info.header.masters  ## FIXME those are ChardetStr
         self.pc_curr_health = save_info.header.pc_curr_health
         self.pc_max_health = save_info.header.pc_max_health
         # Read the image data - note that it comes as BGRA, which we
