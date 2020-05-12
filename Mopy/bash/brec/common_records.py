@@ -96,12 +96,12 @@ class MreHeaderBase(MelRecord):
     class MelAuthor(_MelChardet):
         def __init__(self):
             super(MreHeaderBase.MelAuthor, self).__init__(b'CNAM', u'author',
-                ChardetStr(b''), 512)
+                ChardetStr(b''), 511)
 
     class MelDescription(_MelChardet):
         def __init__(self):
             super(MreHeaderBase.MelDescription, self).__init__(b'SNAM',
-                u'description', ChardetStr(b''), 512)
+                u'description', ChardetStr(b''), 511)
 
     def set_mod_author(self, new_author):
         if isinstance(new_author, unicode):
