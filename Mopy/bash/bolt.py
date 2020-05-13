@@ -81,28 +81,28 @@ except ImportError:
 #  This is only useful when reading fields from mods, as the encoding is not
 #  known.  For normal filesystem interaction, these functions are not needed
 encodingOrder = (
-    'ascii',    # Plain old ASCII (0-127)
-    'gbk',      # GBK (simplified Chinese + some)
-    'cp932',    # Japanese
-    'cp949',    # Korean
-    'cp1252',   # English (extended ASCII)
-    'utf8',
-    'cp500',
-    'UTF-16LE',
+    u'ascii',    # Plain old ASCII (0-127)
+    u'gbk',      # GBK (simplified Chinese + some)
+    u'cp932',    # Japanese
+    u'cp949',    # Korean
+    u'cp1252',   # English (extended ASCII)
+    u'utf8',
+    u'cp500',
+    u'UTF-16LE',
     )
 if os.name == u'nt':
-    encodingOrder += ('mbcs',)
+    encodingOrder += (u'mbcs',)
 
 _encodingSwap = {
     # The encoding detector reports back some encodings that
     # are subsets of others.  Use the better encoding when
     # given the option
     # 'reported encoding':'actual encoding to use',
-    'GB2312': 'gbk',        # Simplified Chinese
-    'SHIFT_JIS': 'cp932',   # Japanese
-    'windows-1252': 'cp1252',
-    'windows-1251': 'cp1251',
-    'utf-8': 'utf8',
+    u'GB2312': u'gbk',        # Simplified Chinese
+    u'SHIFT_JIS': u'cp932',   # Japanese
+    u'windows-1252': u'cp1252',
+    u'windows-1251': u'cp1251',
+    u'utf-8': u'utf8',
     }
 
 # Preferred encoding to use when decoding/encoding strings in plugin files
@@ -128,14 +128,16 @@ def decoder(byte_str, encoding=None, avoidEncodings=(), returnEncoding=False):
         if returnEncoding: return unicode(byte_str, encoding), encoding
         return unicode(byte_str, encoding)
     # Try the user specified encoding first
-    # TODO(ut) monkey patch
-    if encoding == 'cp65001':
-        encoding = 'utf-8'
     if encoding:
+        encoding = unicode(encoding)
+        # TODO(ut) monkey patch
+        if encoding == u'cp65001':
+            encoding = u'utf-8'
         try: return _decoded()
         except UnicodeDecodeError: pass
     # Try to detect the encoding next
     encoding,confidence = getbestencoding(byte_str)
+    encoding = unicode(encoding) if encoding else encoding
     if encoding and confidence >= 0.55 and (encoding not in avoidEncodings or confidence == 1.0):
         try: return _decoded()
         except UnicodeDecodeError: pass
