@@ -29,6 +29,7 @@ from __future__ import division, print_function
 from collections import Counter, defaultdict
 from itertools import starmap, repeat
 
+from .save_headers import OblivionSaveHeader
 from .. import bolt, bush
 from ..bolt import Flags, sio, GPath, decoder, deprint, encode, cstrip, \
     SubProgress, unpack_byte, unpack_str8, unpack_many, unpack_int, \

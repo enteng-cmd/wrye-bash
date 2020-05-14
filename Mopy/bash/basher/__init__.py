@@ -2054,7 +2054,7 @@ class SaveDetails(_ModsSavesDetails):
             saveInfo = self.saveInfo = bosh.saveInfos[fileName]
             #--Remember values for edit checks
             self.fileStr = saveInfo.name.s
-            self.playerNameStr = saveInfo.header.pcName
+            self.playerNameStr = u'%s' % saveInfo.header.pcName
             self.curCellStr = saveInfo.header.pcLocation
             self.gameDays = saveInfo.header.gameDays
             self.playMinutes = saveInfo.header.gameTicks//60000

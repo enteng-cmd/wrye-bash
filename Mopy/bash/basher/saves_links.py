@@ -291,7 +291,7 @@ class Save_RenamePlayer(ItemLink):
         saveInfo = bosh.saveInfos[self.selected[0]]
         newName = self._askText(
             _(u"Enter new player name. E.g. Conan the Bold"),
-            title=_(u"Rename player"), default=saveInfo.header.pcName)
+            title=_(u"Rename player"), default=u'%s' % saveInfo.header.pcName)
         if not newName: return
         for save in self.iselected_infos():
             savedPlayer = bosh._saves.Save_NPCEdits(save)
