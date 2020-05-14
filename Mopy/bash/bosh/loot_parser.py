@@ -194,11 +194,6 @@ class LOOTParser(object):
             self._tagCache[modName] = self.get_plugin_tags(modName)
             return self._tagCache[modName]
 
-    def getDirtyMessage(self, modName, mod_infos):
-        if self.is_plugin_dirty(modName, mod_infos):
-            return True, u'Contains dirty edits, needs cleaning.'
-        return False, u''
-
 # Implementation
 class _PluginEntry(object):
     """Represents stored information about a plugin's entry in the LOOT
