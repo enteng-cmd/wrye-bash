@@ -304,7 +304,7 @@ class MreLeveledList(MreLeveledListBase):
             MelUInt8.__init__(self, 'LVLD', 'chanceNone')
 
         def loadData(self, record, ins, sub_type, size_, readId):
-            MelStruct.loadData(self, record, ins, sub_type, size_, readId)
+            MelUInt8.loadData(self, record, ins, sub_type, size_, readId)
             if record.chanceNone > 127:
                 record.flags.calcFromAllLevels = True
                 record.chanceNone &= 127

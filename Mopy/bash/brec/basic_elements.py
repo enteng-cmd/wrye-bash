@@ -145,7 +145,7 @@ class MelBase(Subrecord):
 
     @staticmethod
     def parseElements(*elements):
-        # type: (list[None|unicode|tuple]) -> list[tuple]
+        # type: (list[None|unicode|tuple]) -> tuple[tuple] | list[tuple]
         """Parses elements and returns attrs,defaults,actions,formAttrs where:
         * attrs is tuple of attributes (names)
         * formAttrs is tuple of attributes that have fids,
@@ -163,18 +163,20 @@ class MelBase(Subrecord):
         attrs, defaults, actions = [0] * lenEls, [0] * lenEls, [0] * lenEls
         formAttrsAppend = formAttrs.append
         for index,element in enumerate(elements):
-            if not isinstance(element,tuple): element = (element,)
-            el_0 = element[0]
-            attrIndex = el_0 == 0
-            if el_0 == FID:
-                formAttrsAppend(element[1])
-                attrIndex = 1
-            elif callable(el_0):
-                actions[index] = el_0
-                attrIndex = 1
-            attrs[index] = element[attrIndex]
-            if len(element) - attrIndex == 2:
-                defaults[index] = element[-1] # else leave to 0
+            if not isinstance(element,tuple):
+                attrs[index] = element
+            else:
+                el_0 = element[0]
+                attrIndex = el_0 == 0
+                if el_0 == FID:
+                    formAttrsAppend(element[1])
+                    attrIndex = 1
+                elif callable(el_0):
+                    actions[index] = el_0
+                    attrIndex = 1
+                attrs[index] = element[attrIndex]
+                if len(element) - attrIndex == 2:
+                    defaults[index] = element[-1] # else leave to 0
         return map(tuple,(attrs,defaults,actions,formAttrs))
 
     def getDefaulters(self,defaulters,base):
@@ -235,6 +237,44 @@ class MelBase(Subrecord):
 
         :rtype: int"""
         raise exception.AbstractError()
+
+# Simple static Fields --------------------------------------------------------
+def _get_structs(struct_format):
+    _struct = struct.Struct(struct_format)
+    return _struct.unpack, _struct.pack, _struct.size
+
+class _MelField(MelBase):
+    """A simple static subrecord. `action` is usually a Flags type object.
+    TODO: MelFlags??"""
+    _unpacker, _packer, static_size = _get_structs(u'I')
+    __slots__ = (u'action', u'formAttrs')
+
+    def __init__(self, mel_sig, element):
+        attrs, defaults, actions, self.formAttrs = MelBase.parseElements(
+            element)
+        self.mel_sig, self.attr, self.default = mel_sig, attrs[0], defaults[0]
+        self.action = actions[0]
+
+    def hasFids(self,formElements):
+        if self.formAttrs: formElements.add(self)
+
+    def setDefault(self, record):
+        record.__setattr__(self.attr,
+            self.action(self.default) if self.action else self.default)
+
+    def loadData(self, record, ins, sub_type, size_, readId):
+        value, = ins.unpack(self._unpacker, size_, readId)
+        record.__setattr__(self.attr,
+            self.action(value) if self.action else value)
+
+    def pack_subrecord_data(self, record):
+        value = record.__getattribute__(self.attr)
+        return self._packer(value.dump() if self.action else value)
+
+    def mapFids(self,record,function,save=False):
+        if self.formAttrs:
+            result = function(record.__getattribute__(self.formAttrs[0]))
+            if save: record.__setattr__(self.formAttrs[0], result)
 
 #------------------------------------------------------------------------------
 class MelCounter(MelBase):
@@ -636,27 +676,6 @@ class MelStruct(MelBase):
         return self._static_size
 
 # Simple primitive type wrappers ----------------------------------------------
-def _get_structs(struct_format):
-    _struct = struct.Struct(struct_format)
-    return _struct.unpack, _struct.pack, _struct.size
-
-class _MelField(MelStruct):
-    """A simple static subrecord - no actions and a static unpacker."""
-    _unpacker, _packer, static_size = _get_structs(u'I')
-
-    def __init__(self, mel_sig, element):
-        self.mel_sig = mel_sig
-        self.attrs, self.defaults, self.actions, self.formAttrs = \
-             MelStruct.parseElements(element)
-        self.attr = self.attrs[0]
-
-    def loadData(self, record, ins, sub_type, size_, readId):
-        record.__setattr__(self.attr,
-                           ins.unpack(self._unpacker, size_, readId)[0])
-
-    def pack_subrecord_data(self, record):
-        return self._packer(record.__getattribute__(self.attr))
-
 class MelFloat(_MelField):
     """Float."""
     _unpacker, _packer, static_size = _get_structs(u'=f')
@@ -726,27 +745,37 @@ class MelOptStruct(MelStruct):
 
 #------------------------------------------------------------------------------
 # 'Opt' versions of the type wrappers above
-class MelOptFloat(MelFloat, MelOptStruct):
+class MelOptField(_MelField):
+    """Represents an optional field that is only dumped if at least one
+    value is not equal to the default."""
+
+    def pack_subrecord_data(self, record):
+        oldValue = record.__getattribute__(self.attr)
+        if oldValue is not None and oldValue != self.default:
+            return super(MelOptField, self).pack_subrecord_data(record)
+        return None
+
+class MelOptFloat(MelFloat, MelOptField):
     """Optional float."""
 
 # Unused right now - keeping around for completeness' sake and to make future
 # usage simpler.
-class MelOptSInt8(MelSInt8, MelOptStruct):
+class MelOptSInt8(MelSInt8, MelOptField):
     """Optional signed 8-bit integer."""
 
-class MelOptSInt16(MelSInt16, MelOptStruct):
+class MelOptSInt16(MelSInt16, MelOptField):
     """Optional signed 16-bit integer."""
 
-class MelOptSInt32(MelSInt32, MelOptStruct):
+class MelOptSInt32(MelSInt32, MelOptField):
     """Optional signed 32-bit integer."""
 
-class MelOptUInt8(MelUInt8, MelOptStruct):
+class MelOptUInt8(MelUInt8, MelOptField):
     """Optional unsigned 8-bit integer."""
 
-class MelOptUInt16(MelUInt16, MelOptStruct):
+class MelOptUInt16(MelUInt16, MelOptField):
     """Optional unsigned 16-bit integer."""
 
-class MelOptUInt32(MelUInt32, MelOptStruct):
+class MelOptUInt32(MelUInt32, MelOptField):
     """Optional unsigned 32-bit integer."""
 
 class MelOptFid(MelOptUInt32):
