@@ -188,7 +188,7 @@ class ModFile(object):
             raise ArgumentError(u'Invalid top group type: '+topType)
 
     def load(self, do_unpack=False, progress=None, loadStrings=True,
-             catch_errors=True):
+             catch_errors=False): # TODO: let it blow?
         """Load file."""
         from . import bosh
         progress = progress or bolt.Progress()
@@ -228,7 +228,7 @@ class ModFile(object):
                 try:
                     if topClass:
                         self.tops[label] = topClass(header, self.loadFactory)
-                        self.tops[label].load(ins, do_unpack and (topClass != MobBase))
+                        self.tops[label].load_rec_group(ins, do_unpack and (topClass != MobBase))
                     else:
                         self.topsSkipped.add(label)
                         header.skip_group(ins)
