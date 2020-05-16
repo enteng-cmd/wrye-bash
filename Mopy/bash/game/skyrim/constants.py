@@ -24,6 +24,8 @@
 
 #--Game ESM/ESP/BSA files
 #  These filenames need to be in lowercase,
+from itertools import chain
+
 bethDataFiles = {
     #--Vanilla
     u'skyrim.esm',
@@ -2379,10 +2381,6 @@ cellRecFlags = {
 #------------------------------------------------------------------------------
 # GraphicsPatcher
 #------------------------------------------------------------------------------
-graphicsLongsTypes = {'ACTI', 'ALCH', 'AMMO', 'APPA', 'ARMA', 'ARMO', 'BOOK',
-                      'CLAS', 'CONT', 'DOOR', 'EFSH', 'FLOR', 'FURN', 'GRAS',
-                      'INGR', 'KEYM', 'LIGH', 'LSCR', 'SCRL', 'SLGM', 'SPEL',
-                      'STAT', 'TREE', 'WEAP', 'WTHR', 'MGEF'}
 graphicsTypes = {
     "ACTI": ('model',),
     "ALCH": ('iconPath','model',),
@@ -2449,6 +2447,7 @@ graphicsFidTypes = {
              'enchantShader', 'hitEffectArt', 'hitShader',
              'menuDisplayObject',)
 }
+graphicsLongsTypes = set(chain(graphicsTypes, graphicsFidTypes))
 graphicsModelAttrs = ('model',)
 #------------------------------------------------------------------------------
 # Inventory Patcher

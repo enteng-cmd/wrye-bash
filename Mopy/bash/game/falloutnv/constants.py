@@ -299,8 +299,6 @@ soundsTypes.update({
 #------------------------------------------------------------------------------
 # GraphicsPatcher
 #------------------------------------------------------------------------------
-graphicsLongsTypes = graphicsLongsTypes | {b'CCRD', b'CHIP', b'CMNY', b'CSNO',
-                                           b'IMOD', b'REPU'}
 graphicsTypes.update({
     b'CCRD': (u'iconPath', u'smallIconPath', u'model', u'textureFace',
               u'textureBack'),
@@ -318,6 +316,7 @@ graphicsTypes.update({
         u'firstPersonModelWithMods', u'animationType', u'gripAnimation',
         u'reloadAnimation'),
 })
+graphicsLongsTypes = set(graphicsTypes)
 
 #------------------------------------------------------------------------------
 # Race Patcher

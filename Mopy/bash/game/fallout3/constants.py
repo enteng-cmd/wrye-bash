@@ -826,12 +826,6 @@ cellRecFlags = {
 #------------------------------------------------------------------------------
 # GraphicsPatcher
 #------------------------------------------------------------------------------
-graphicsLongsTypes = {'ACTI', 'ALCH', 'AMMO', 'ARMA', 'ARMO', 'AVIF', 'BOOK',
-                      'BPTD', 'CLAS', 'COBJ', 'CREA', 'DOOR', 'EFSH', 'EXPL',
-                      'FURN', 'GRAS', 'HDPT', 'INGR', 'IPCT', 'IPDS', 'KEYM',
-                      'LIGH', 'LSCR', 'MICN', 'MISC', 'MSTT', 'NOTE', 'NPC_',
-                      'PERK', 'PROJ', 'PWAT', 'STAT', 'TACT', 'TERM', 'TREE',
-                      'TXST', 'WEAP', 'MGEF',}
 graphicsTypes = {
     "ACTI": ('model',),
     "ALCH": ('iconPath','smallIconPath','model',),
@@ -918,6 +912,7 @@ graphicsTypes = {
              'impactDataset','firstPersonModel','animationType',
              'gripAnimation','reloadAnimation',),
 }
+graphicsLongsTypes = set(graphicsTypes)
 graphicsFidTypes = {
     "MGEF": ('effectShader','light','objectDisplayShader',)
 }
