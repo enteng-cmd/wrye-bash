@@ -296,6 +296,7 @@ class _ANamesTweak_Potions(_AMgefNamesTweak):
             (_(u'(XD) Illness'), u'(%s) '),)
 
     def _do_exec_rename(self, record, is_food):
+        if record.full is None: return None
         school = 6 # Default to 6 (U: unknown)
         for i, rec_effect in enumerate(record.effects):
             if i == 0:
