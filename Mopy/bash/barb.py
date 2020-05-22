@@ -148,6 +148,12 @@ class BackupSettings(object):
             fsName_, bolt.timestamp(), bass.settings['bash.version'],
             AppVersion)
 
+    @staticmethod
+    def is_backup(backup_path):
+        """Returns True if the specified path is a backup. Currently only
+        checks if the file extension is 7z."""
+        return backup_path.cext == u'.7z'
+
     def backup_settings(self, balt_):
         deprint(u'')
         deprint(_(u'BACKUP BASH SETTINGS: ') + self._backup_dest_file.s)
