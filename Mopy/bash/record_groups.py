@@ -25,14 +25,16 @@
 """Classes that group records."""
 # Python imports
 from __future__ import division, print_function
+import struct
+from itertools import chain
 from operator import itemgetter
 # Wrye Bash imports
-from .brec import ModReader, RecordHeader
-from .bolt import sio, struct_pack, struct_unpack
+from .brec import ModReader, RecordHeader, GrupHeader, TopGrupHeader, MreRecord
+from .bolt import GPath, sio
 from . import bush # for fallout3/nv fsName
 from .exception import AbstractError, ArgumentError, ModError
 
-# Tes3 Group/Top Types --------------------------------------------------------
+# TES4 Group/Top Types --------------------------------------------------------
 groupTypes = [
     _(u'Top (Type)'),
     _(u'World Children'),
@@ -52,17 +54,18 @@ class MobBase(object):
     support unpacking, but can report its number of records and be written."""
 
     __slots__ = ['header','size','label','groupType','stamp','debug','data',
-                 'changed','numRecords','loadFactory','inName']
+                 'changed','numRecords','loadFactory','inName'] ##: nice collection of forbidden names, including header -> group_header
 
     def __init__(self, header, loadFactory, ins=None, do_unpack=False):
         self.header = header
-        if header.recType == 'GRUP':
-            self.size,self.label,self.groupType,self.stamp = (
-                header.size,header.label,header.groupType,header.stamp)
-        else:
+        self.size = header.size
+        if header.recType == b'GRUP':
+            self.label, self.groupType, self.stamp = (
+                header.label, header.groupType, header.stamp)
+        else: # TODO(ut) should MobBase used for *non* GRUP headers??
             # Yes it's weird, but this is how it needs to work
-            self.size,self.label,self.groupType,self.stamp = (
-                header.size,header.flags1,header.fid,header.flags2)
+            self.label, self.groupType, self.stamp = (
+                header.flags1, header.fid, header.flags2)
         self.debug = False
         self.data = None
         self.changed = False
@@ -76,23 +79,20 @@ class MobBase(object):
         if self.debug: print(u'GRUP load:',self.label)
         #--Read, but don't analyze.
         if not do_unpack:
-            self.data = ins.read(self.size - self.header.__class__.rec_header_size, type(self))
+            self.data = ins.read(self.size - RecordHeader.rec_header_size,
+                                 type(self))
         #--Analyze ins.
         elif ins is not None:
-            self.loadData(ins,
-                          ins.tell() + self.size - self.header.__class__.rec_header_size)
+            self.load_rec_group(ins,
+                ins.tell() + self.size - RecordHeader.rec_header_size)
         #--Analyze internal buffer.
         else:
             with self.getReader() as reader:
-                self.loadData(reader,reader.size)
+                self.load_rec_group(reader, reader.size)
         #--Discard raw data?
         if do_unpack:
             self.data = None
             self.setChanged()
-
-    def loadData(self,ins,endPos):
-        """Loads data from input stream. Called by load()."""
-        raise AbstractError
 
     def setChanged(self,value=True):
         """Sets changed attribute to value. [Default = True.]"""
@@ -137,17 +137,53 @@ class MobBase(object):
             self.getNumRecords()
         if self.numRecords > 0:
             self.header.size = self.size
-            out.write(self.header.pack())
+            out.write(self.header.pack_head())
             out.write(self.data)
 
     def getReader(self):
         """Returns a ModReader wrapped around self.data."""
         return ModReader(self.inName,sio(self.data))
 
+    # Abstract methods --------------------------------------------------------
     def convertFids(self,mapper,toLong):
         """Converts fids between formats according to mapper.
         toLong should be True if converting to long format or False if
         converting to short format."""
+        raise AbstractError
+
+    def indexRecords(self):
+        """Indexes records by fid."""
+        raise AbstractError
+
+    def iter_records(self):
+        """Flattens the structure of this record block into a linear sequence
+        of records. Works as an iterator for memory reasons."""
+        raise AbstractError
+
+    def keepRecords(self, p_keep_ids):
+        """Keeps records with fid in set p_keep_ids. Discards the rest."""
+        raise AbstractError
+
+    def load_rec_group(self, ins, endPos):
+        """Loads data from input stream. Called by load()."""
+        raise AbstractError
+
+    ##: params here are not the prettiest
+    def merge_records(self, block, loadSet, mergeIds, iiSkipMerge, doFilter):
+        """Merges records from the specified block into this block and performs
+        merge filtering if doFilter is True.
+
+        :param block: The block to merge records from.
+        :param loadSet: The set of currently loaded plugins.
+        :param mergeIds: A set into which the fids of all records that will be
+            merged by this operation will be added.
+        :param iiSkipMerge: If True, skip merging and only perform merge
+            filtering. Used by IIM mode.
+        :param doFilter: If True, perform merge filtering."""
+        raise AbstractError
+
+    def updateMasters(self, masters):
+        """Updates set of master names according to masters actually used."""
         raise AbstractError
 
     def updateRecords(self,block,mapper,toLong):
@@ -165,7 +201,7 @@ class MobObjects(MobBase):
         self.id_records = {}
         MobBase.__init__(self, header, loadFactory, ins, do_unpack)
 
-    def loadData(self,ins,endPos):
+    def load_rec_group(self, ins, endPos):
         """Loads data from input stream. Called by load()."""
         expType = self.label
         recClass = self.loadFactory.getRecClass(expType)
@@ -208,14 +244,13 @@ class MobObjects(MobBase):
     def dump(self,out):
         """Dumps group header and then records."""
         if not self.changed:
-            out.write(RecordHeader('GRUP',self.size, self.label, 0,
-                                   self.stamp).pack())
+            out.write(TopGrupHeader(self.size, self.label, 0, ##: self.header.pack_head() ?
+                                    self.stamp).pack_head())
             out.write(self.data)
         else:
             size = self.getSize()
             if size == RecordHeader.rec_header_size: return
-            out.write(
-                RecordHeader('GRUP', size, self.label, 0, self.stamp).pack())
+            out.write(TopGrupHeader(size,self.label,0,self.stamp).pack_head())
             for record in self.records:
                 record.dump(out)
 
@@ -271,12 +306,12 @@ class MobObjects(MobBase):
             self.records.append(record)
         self.id_records[record_id] = record
 
-    def keepRecords(self,keepIds):
-        """Keeps records with fid in set keepIds. Discards the rest."""
+    def keepRecords(self, p_keep_ids):
+        """Keeps records with fid in set p_keep_ids. Discards the rest."""
         from . import bosh
         self.records = [record for record in self.records if (record.fid == (
             record.isKeyedByEid and bosh.modInfos.masterName,
-            0) and record.eid in keepIds) or record.fid in keepIds]
+            0) and record.eid in p_keep_ids) or record.fid in p_keep_ids]
         self.id_records.clear()
         self.setChanged()
 
@@ -290,6 +325,50 @@ class MobObjects(MobBase):
                 self.setRecord(record)
                 mergeIds.discard(record.fid)
 
+    def merge_records(self, block, loadSet, mergeIds, iiSkipMerge, doFilter):
+        # YUCK, drop these local imports!
+        from .mod_files import MasterSet
+        bad_form = (GPath(u'Oblivion.esm'), 0xA31D) # DarkPCB record
+        filtered = []
+        filteredAppend = filtered.append
+        loadSetIsSuperset = loadSet.issuperset
+        mergeIdsAdd = mergeIds.add
+        copy_to_self = self.setRecord
+        for record in block.getActiveRecords():
+            fid = record.fid
+            if fid == bad_form: continue
+            #--Include this record?
+            if doFilter:
+                # If we're Filter-tagged, perform merge filtering. Then, check
+                # if the record has any FormIDs with masters that are on disk
+                # left. If it does not, skip the whole record (because all of
+                # its contents have been merge-filtered out).
+                record.mergeFilter(loadSet)
+                masters = MasterSet()
+                record.updateMasters(masters)
+                if not loadSetIsSuperset(masters):
+                    continue
+            # We're either not Filter-tagged or we want to keep this record
+            filteredAppend(record)
+            # If we're IIM-tagged and this is not one of the IIM-approved
+            # record types, skip merging
+            if iiSkipMerge: continue
+            # We're past all hurdles - stick a copy of this record into
+            # ourselves and mark it as merged
+            if record.isKeyedByEid and fid == self._null_fid:
+                mergeIdsAdd(record.eid)
+            else:
+                mergeIdsAdd(fid)
+            copy_to_self(record.getTypeCopy())
+        # Apply any merge filtering we've done above to the record block in
+        # question. That way, patchers won't see the records that have been
+        # filtered out here.
+        block.records = filtered
+        block.indexRecords()
+
+    def iter_records(self):
+        return iter(self.records)
+
     def __repr__(self):
         return u'<%s GRUP: %u record(s)>' % (self.label, len(self.records))
 
@@ -297,10 +376,10 @@ class MobObjects(MobBase):
 class MobDials(MobObjects):
     """DIAL top block of mod file."""
 
-    def loadData(self,ins,endPos):
+    def load_rec_group(self, ins, endPos):
         """Loads data from input stream. Called by load()."""
         expType = self.label
-        recClass = self.loadFactory.getRecClass(expType)
+        recClass = MreRecord.type_class[b'DIAL']
         errLabel = expType + u' Top Block'
         records = self.records
         insAtEnd = ins.atEnd
@@ -324,12 +403,12 @@ class MobDials(MobObjects):
                     try: # record/recordLoadInfos should be initialized in 'if'
                         record.infoStamp = stamp
                         infoClass = loadGetRecClass('INFO')
+                        hsize = RecordHeader.rec_header_size
                         if infoClass:
-                            recordLoadInfos(ins, ins.tell() + size -
-                                            header.__class__.rec_header_size,
+                            recordLoadInfos(ins, ins.tell() + size - hsize,
                                             infoClass)
                         else:
-                            ins.seek(ins.tell() + size - header.__class__.rec_header_size)
+                            ins.seek(ins.tell() + size - hsize)
                     except AttributeError:
                         raise ModError(self.inName, u'Malformed Plugin: '
                             u'Exterior CELL subblock before worldspace GRUP')
@@ -380,7 +459,7 @@ class MobCell(MobBase):
         self.pgrd = None
         MobBase.__init__(self, header, loadFactory, ins, do_unpack)
 
-    def loadData(self,ins,endPos):
+    def load_rec_group(self, ins, endPos):
         """Loads data from input stream. Called by load()."""
         cellType_class = self.loadFactory.getCellTypeClass()
         persistent,temp,distant = self.persistent,self.temp,self.distant
@@ -494,13 +573,13 @@ class MobCell(MobBase):
         self.cell.dump(out)
         childrenSize = self.getChildrenSize()
         if not childrenSize: return
-        out.writeGroup(childrenSize,self.cell.fid,6,self.stamp)
+        self._write_group_header(out, childrenSize, 6)
         if self.persistent:
-            out.writeGroup(self.getPersistentSize(),self.cell.fid,8,self.stamp)
+            self._write_group_header(out, self.getPersistentSize(), 8)
             for record in self.persistent:
                 record.dump(out)
         if self.temp or self.pgrd or self.land:
-            out.writeGroup(self.getTempSize(),self.cell.fid,9,self.stamp)
+            self._write_group_header(out, self.getTempSize(), 9)
             if self.pgrd:
                 self.pgrd.dump(out)
             if self.land:
@@ -508,9 +587,13 @@ class MobCell(MobBase):
             for record in self.temp:
                 record.dump(out)
         if self.distant:
-            out.writeGroup(self.getDistantSize(),self.cell.fid,10,self.stamp)
+            self._write_group_header(out, self.getDistantSize(), 10)
             for record in self.distant:
                 record.dump(out)
+
+    def _write_group_header(self, out, group_size, group_type):
+        out.write(GrupHeader(group_size, self.cell.fid, group_type,
+                             self.stamp).pack_head()) # FIXME was TESIV only - self.extra??
 
     #--Fid manipulation, record filtering ----------------------------------
     def convertFids(self,mapper,toLong):
@@ -548,7 +631,6 @@ class MobCell(MobBase):
         mergeDiscard = mergeIds.discard
         selfGetter = self.__getattribute__
         srcGetter = srcBlock.__getattribute__
-        selfSetter = self.__setattr__
         for attr in ('cell','pgrd','land'):
             myRecord = selfGetter(attr)
             record = srcGetter(attr)
@@ -558,31 +640,97 @@ class MobCell(MobBase):
                         myRecord.fid,record.fid))
                 if not record.flags1.ignored:
                     record = record.getTypeCopy(mapper)
-                    selfSetter(attr,record)
+                    setattr(self, attr, record)
                     mergeDiscard(record.fid)
         for attr in ('persistent','temp','distant'):
             recordList = selfGetter(attr)
-            fids = dict(
-                (record.fid,index) for index,record in enumerate(recordList))
+            fids = {record.fid: i for i, record in enumerate(recordList)}
             for record in srcGetter(attr):
                 if not record.flags1.ignored and mapper(record.fid) in fids:
                     record = record.getTypeCopy(mapper)
                     recordList[fids[record.fid]] = record
                     mergeDiscard(record.fid)
 
-    def keepRecords(self,keepIds):
-        """Keeps records with fid in set keepIds. Discards the rest."""
-        if self.pgrd and self.pgrd.fid not in keepIds:
+    def iter_records(self):
+        single_recs = [x for x in (self.cell, self.pgrd, self.land) if x]
+        return chain(single_recs, self.persistent, self.distant, self.temp)
+
+    def keepRecords(self, p_keep_ids):
+        """Keeps records with fid in set p_keep_ids. Discards the rest."""
+        if self.pgrd and self.pgrd.fid not in p_keep_ids:
             self.pgrd = None
-        if self.land and self.land.fid not in keepIds:
+        if self.land and self.land.fid not in p_keep_ids:
             self.land = None
-        self.temp       = [x for x in self.temp if x.fid in keepIds]
-        self.persistent = [x for x in self.persistent if x.fid in keepIds]
-        self.distant    = [x for x in self.distant if x.fid in keepIds]
+        self.temp       = [x for x in self.temp if x.fid in p_keep_ids]
+        self.persistent = [x for x in self.persistent if x.fid in p_keep_ids]
+        self.distant    = [x for x in self.distant if x.fid in p_keep_ids]
         if self.pgrd or self.land or self.persistent or self.temp or \
                 self.distant:
-            keepIds.add(self.cell.fid)
+            p_keep_ids.add(self.cell.fid)
         self.setChanged()
+
+    def merge_records(self, block, loadSet, mergeIds, iiSkipMerge, doFilter):
+        from .mod_files import MasterSet # YUCK
+        loadSetIsSuperset = loadSet.issuperset
+        mergeIdsAdd = mergeIds.add
+        for single_attr in (u'cell', u'pgrd', u'land'):
+            # Grab the version that we're trying to merge, and check if there's
+            # even one present
+            src_rec = getattr(block, single_attr)
+            if src_rec:
+                # If we're Filter-tagged, perform merge filtering first
+                if doFilter:
+                    src_rec.mergeFilter(loadSet)
+                    masters = MasterSet()
+                    src_rec.updateMasters(masters)
+                    if not loadSetIsSuperset(masters):
+                        # Filtered out, discard this record and skip to next
+                        setattr(block, single_attr, None)
+                        continue
+                # In IIM, skip all merging (duh)
+                if iiSkipMerge: continue
+                dest_rec = getattr(self, single_attr)
+                if dest_rec and dest_rec.fid != src_rec.fid:
+                    raise ArgumentError(u"Fids don't match! %08x, %08x" % (
+                        dest_rec.fid, src_rec.fid))
+                if not src_rec.flags1.ignored:
+                    # We're past all hurdles - stick a copy of this record into
+                    # ourselves and mark it as merged
+                    mergeIdsAdd(src_rec.fid)
+                    setattr(self, single_attr, src_rec.getTypeCopy())
+        for list_attr in (u'temp', u'persistent', u'distant'):
+            filtered_list = []
+            filtered_append = filtered_list.append
+            # Build a mapping from fids in the current list to the index at
+            # which they're stored ##: cache? see also updateRecords above
+            dest_list = getattr(self, list_attr)
+            append_to_dest = dest_list.append
+            id_fids = {record.fid: i for i, record
+                       in enumerate(dest_list)}
+            for src_rec in getattr(block, list_attr):
+                # If we're Filter-tagged, perform merge filtering first
+                if doFilter:
+                    src_rec.mergeFilter(loadSet)
+                    masters = MasterSet()
+                    src_rec.updateMasters(masters)
+                    if not loadSetIsSuperset(masters):
+                        continue
+                # We're either not Filter-tagged or we want to keep this record
+                filtered_append(src_rec)
+                # In IIM, skip all merging (duh)
+                if iiSkipMerge: continue
+                if not src_rec.flags1.ignored:
+                    # We're past all hurdles - stick a copy of this record into
+                    # ourselves and mark it as merged
+                    src_fid = src_rec.fid
+                    rec_copy = src_rec.getTypeCopy()
+                    mergeIdsAdd(src_fid)
+                    if rec_copy.fid in id_fids:
+                        dest_list[id_fids[src_fid]] = rec_copy
+                    else:
+                        append_to_dest(rec_copy)
+            # Apply any merge filtering we've done here
+            setattr(block, list_attr, filtered_list)
 
 #------------------------------------------------------------------------------
 class MobCells(MobBase):
@@ -612,11 +760,19 @@ class MobCells(MobBase):
         if fid in self.id_cellBlock:
             self.id_cellBlock[fid].cell = cell
         else:
-            cellBlock = MobCell(RecordHeader('GRUP', 0, 0, 6, self.stamp),
+            cellBlock = MobCell(GrupHeader(0, 0, 6, self.stamp), ##: Note label is 0 here - specialized GrupHeader subclass?
                                 self.loadFactory, cell)
             cellBlock.setChanged()
             self.cellBlocks.append(cellBlock)
             self.id_cellBlock[fid] = cellBlock
+
+    def remove_cell(self, cell):
+        """Removes the specified cell from this block. The exact cell object
+        must be present, otherwise a ValueError is raised."""
+        if self.cellBlocks and not self.id_cellBlock:
+            self.indexRecords()
+        self.cellBlocks.remove(cell)
+        del self.id_cellBlock[cell.fid]
 
     def getUsedBlocks(self):
         """Returns a set of blocks that exist in this group."""
@@ -661,12 +817,12 @@ class MobCells(MobBase):
             bsb0 = (block,None)
             if block != curBlock:
                 curBlock,curSubblock = bsb0
-                outWrite(RecordHeader('GRUP',bsb_size[bsb0],block,
-                                      blockGroupType,stamp).pack())
+                outWrite(GrupHeader(bsb_size[bsb0], block, blockGroupType, ##: Here come the tuples - specialized GrupHeader subclass?
+                                    stamp).pack_head())
             if subblock != curSubblock:
                 curSubblock = subblock
-                outWrite(RecordHeader('GRUP',bsb_size[bsb],subblock,
-                                      subBlockGroupType,stamp).pack())
+                outWrite(GrupHeader(bsb_size[bsb], subblock, subBlockGroupType, ##: Here come the tuples - specialized GrupHeader subclass?
+                                    stamp).pack_head())
             cellBlock.dump(out)
 
     def getNumRecords(self,includeGroups=1):
@@ -678,14 +834,62 @@ class MobCells(MobBase):
         return count
 
     #--Fid manipulation, record filtering ----------------------------------
-    def keepRecords(self,keepIds):
-        """Keeps records with fid in set keepIds. Discards the rest."""
-        #--Note: this call will add the cell to keepIds if any of its
+    def iter_records(self):
+        return chain.from_iterable(c.iter_records() for c in self.cellBlocks)
+
+    def keepRecords(self, p_keep_ids):
+        """Keeps records with fid in set p_keep_ids. Discards the rest."""
+        #--Note: this call will add the cell to p_keep_ids if any of its
         # related records are kept.
-        for cellBlock in self.cellBlocks: cellBlock.keepRecords(keepIds)
-        self.cellBlocks = [x for x in self.cellBlocks if x.cell.fid in keepIds]
+        for cellBlock in self.cellBlocks: cellBlock.keepRecords(p_keep_ids)
+        self.cellBlocks = [x for x in self.cellBlocks if x.cell.fid in p_keep_ids]
         self.id_cellBlock.clear()
         self.setChanged()
+
+    def merge_records(self, block, loadSet, mergeIds, iiSkipMerge, doFilter):
+        from .mod_files import MasterSet # YUCK
+        if self.cellBlocks and not self.id_cellBlock:
+            self.indexRecords()
+        lookup_cell_block = self.id_cellBlock.get
+        filtered_cell_blocks = []
+        filtered_append = filtered_cell_blocks.append
+        loadSetIsSuperset = loadSet.issuperset
+        for src_cell_block in block.cellBlocks:
+            was_newly_added = False
+            src_fid = src_cell_block.cell.fid
+            # Check if we already have a cell with that FormID
+            dest_cell_block = lookup_cell_block(src_fid)
+            if not dest_cell_block:
+                # We do not, add it and then look up again
+                ##: Shouldn't all the setCell calls use getTypeCopy?
+                self.setCell(src_cell_block.cell)
+                dest_cell_block = lookup_cell_block(src_fid)
+                was_newly_added = True
+            # Delegate merging to the (potentially newly added) child cell
+            dest_cell_block.merge_records(src_cell_block, loadSet,
+                mergeIds, iiSkipMerge, doFilter)
+            # In IIM, skip all merging - note that we need to remove the child
+            # cell again if it was newly added in IIM mode.
+            if iiSkipMerge:
+                if was_newly_added:
+                    self.remove_cell(dest_cell_block.cell)
+                continue
+            # If we're Filter-tagged, check if the child cell got filtered out
+            if doFilter:
+                masters = MasterSet()
+                src_cell_block.updateMasters(masters)
+                if not loadSetIsSuperset(masters):
+                    # The child cell got filtered out. If it was newly added,
+                    # we need to remove it from this block again. Otherwise, we
+                    # can just skip forward to the next child cell.
+                    if was_newly_added:
+                        self.remove_cell(dest_cell_block.cell)
+                    continue
+            # We're either not Filter-tagged or we want to keep this cell
+            filtered_append(src_cell_block)
+        # Apply any merge filtering we've done above to the record block
+        block.cellBlocks = filtered_cell_blocks
+        block.indexRecords()
 
     def convertFids(self,mapper,toLong):
         """Converts fids between formats according to mapper.
@@ -715,7 +919,7 @@ class MobCells(MobBase):
 class MobICells(MobCells):
     """Tes4 top block for interior cell records."""
 
-    def loadData(self,ins,endPos):
+    def load_rec_group(self, ins, endPos):
         """Loads data from input stream. Called by load()."""
         expType = self.label
         recCellClass = self.loadFactory.getRecClass(expType)
@@ -746,7 +950,7 @@ class MobICells(MobCells):
             elif recType == 'GRUP':
                 size,groupFid,groupType = header.size,header.label, \
                                           header.groupType
-                delta = size - header.__class__.rec_header_size
+                delta = size - RecordHeader.rec_header_size
                 if groupType == 2: # Block number
                     endBlockPos = insTell() + delta
                 elif groupType == 3: # Sub-block number
@@ -783,12 +987,12 @@ class MobICells(MobCells):
     def dump(self,out):
         """Dumps group header and then records."""
         if not self.changed:
-            out.write(self.header.pack())
+            out.write(self.header.pack_head())
             out.write(self.data)
         elif self.cellBlocks:
             (totalSize, bsb_size, blocks) = self.getBsbSizes()
             self.header.size = totalSize
-            out.write(self.header.pack())
+            out.write(self.header.pack_head())
             self.dumpBlocks(out,blocks,bsb_size,2,3)
 
 #------------------------------------------------------------------------------
@@ -799,7 +1003,8 @@ class MobWorld(MobCells):
         self.road = None
         MobCells.__init__(self, header, loadFactory, ins, do_unpack)
 
-    def loadData(self,ins,endPos):
+    def load_rec_group(self, ins, endPos, __packer=struct.Struct(u'I').pack,
+                       __unpacker=struct.Struct(u'2h').unpack):
         """Loads data from input stream. Called by load()."""
         cellType_class = self.loadFactory.getCellTypeClass()
         errLabel = u'World Block'
@@ -827,7 +1032,7 @@ class MobWorld(MobCells):
             #--Get record info and handle it
             header = insRecHeader()
             recType,size = header.recType,header.size
-            delta = size - header.__class__.rec_header_size
+            delta = size - RecordHeader.rec_header_size
             recClass = cellGet(recType)
             if recType == 'ROAD':
                 if not recClass: insSeek(size,1)
@@ -866,7 +1071,7 @@ class MobWorld(MobCells):
             elif recType == 'GRUP':
                 groupFid,groupType = header.label,header.groupType
                 if groupType == 4: # Exterior Cell Block
-                    block = struct_unpack('2h', struct_pack('I', groupFid))
+                    block = __unpacker(__packer(groupFid))
                     block = (block[1],block[0])
                     endBlockPos = insTell() + delta
                 elif groupType == 5: # Exterior Cell Sub-Block
@@ -932,7 +1137,7 @@ class MobWorld(MobCells):
         worldSize = self.world.getSize() + hsize
         self.world.dump(out)
         if not self.changed:
-            out.write(self.header.pack())
+            out.write(self.header.pack_head())
             out.write(self.data)
             return self.size + worldSize
         elif self.cellBlocks or self.road or self.worldCellBlock:
@@ -944,7 +1149,7 @@ class MobWorld(MobCells):
             self.header.size = totalSize
             self.header.label = self.world.fid
             self.header.groupType = 1
-            out.write(self.header.pack())
+            out.write(self.header.pack_head())
             if self.road:
                 self.road.dump(out)
             if self.worldCellBlock:
@@ -977,37 +1182,95 @@ class MobWorld(MobCells):
 
     def updateRecords(self,srcBlock,mapper,mergeIds):
         """Updates any records in 'self' that exist in 'srcBlock'."""
-        selfGetter = self.__getattribute__
-        srcGetter = srcBlock.__getattribute__
-        selfSetter = self.__setattr__
-        mergeDiscard = mergeIds.discard
         for attr in ('world','road'):
-            myRecord = selfGetter(attr)
-            record = srcGetter(attr)
+            myRecord = getattr(self, attr)
+            record = getattr(srcBlock, attr)
             if myRecord and record:
                 if myRecord.fid != mapper(record.fid):
                     raise ArgumentError(u"Fids don't match! %08x, %08x" % (
                         myRecord.fid,record.fid))
                 if not record.flags1.ignored:
                     record = record.getTypeCopy(mapper)
-                    selfSetter(attr,record)
-                    mergeDiscard(record.fid)
+                    setattr(self, attr, record)
+                    mergeIds.discard(record.fid)
         if self.worldCellBlock and srcBlock.worldCellBlock:
             self.worldCellBlock.updateRecords(srcBlock.worldCellBlock,mapper,
                                               mergeIds)
         MobCells.updateRecords(self,srcBlock,mapper,mergeIds)
 
-    def keepRecords(self,keepIds):
-        """Keeps records with fid in set keepIds. Discards the rest."""
-        if self.road and self.road.fid not in keepIds:
+    def iter_records(self):
+        single_recs = [x for x in (self.world, self.road) if x]
+        c_recs = (self.worldCellBlock.iter_records() if self.worldCellBlock
+                  else [])
+        return chain(single_recs, c_recs, super(MobWorld, self).iter_records())
+
+    def keepRecords(self, p_keep_ids):
+        """Keeps records with fid in set p_keep_ids. Discards the rest."""
+        if self.road and self.road.fid not in p_keep_ids:
             self.road = None
         if self.worldCellBlock:
-            self.worldCellBlock.keepRecords(keepIds)
-            if self.worldCellBlock.cell.fid not in keepIds:
+            self.worldCellBlock.keepRecords(p_keep_ids)
+            if self.worldCellBlock.cell.fid not in p_keep_ids:
                 self.worldCellBlock = None
-        MobCells.keepRecords(self,keepIds)
+        MobCells.keepRecords(self, p_keep_ids)
         if self.road or self.worldCellBlock or self.cellBlocks:
-            keepIds.add(self.world.fid)
+            p_keep_ids.add(self.world.fid)
+
+    def merge_records(self, block, loadSet, mergeIds, iiSkipMerge, doFilter):
+        from .mod_files import MasterSet # YUCK
+        mergeIdsAdd = mergeIds.add
+        loadSetIsSuperset = loadSet.issuperset
+        for single_attr in (u'world', u'road'):
+            src_rec = getattr(block, single_attr)
+            if src_rec:
+                # If we're Filter-tagged, perform merge filtering first
+                if doFilter:
+                    src_rec.mergeFilter(loadSet)
+                    masters = MasterSet()
+                    src_rec.updateMasters(masters)
+                    if not loadSetIsSuperset(masters):
+                        # Filtered out, discard this record and skip to next
+                        setattr(block, single_attr, None)
+                        continue
+                # In IIM, skip all merging (duh)
+                if iiSkipMerge: continue
+                dest_rec = getattr(self, single_attr)
+                if dest_rec and dest_rec.fid != src_rec.fid:
+                    raise ArgumentError(u"Fids don't match! %08x, %08x" % (
+                        dest_rec.fid, src_rec.fid))
+                if not src_rec.flags1.ignored:
+                    # We're past all hurdles - stick a copy of this record into
+                    # ourselves and mark it as merged
+                    mergeIdsAdd(src_rec.fid)
+                    setattr(self, single_attr, src_rec.getTypeCopy())
+        if block.worldCellBlock:
+            was_newly_added = False
+            # If we don't have a world cell block yet, make a new one to merge
+            # the source's world cell block into
+            if not self.worldCellBlock:
+                self.worldCellBlock = MobCell(GrupHeader(0, 0, 6, self.stamp),
+                    self.loadFactory, None) # cell will be set in merge_records
+                was_newly_added = True
+            # Delegate merging to the (potentially newly added) block
+            self.worldCellBlock.merge_records(block.worldCellBlock, loadSet,
+                mergeIds, iiSkipMerge, doFilter)
+            # In IIM, skip all merging - note that we need to remove the world
+            # cell block again if it was newly added in IIM mode.
+            if iiSkipMerge:
+                if was_newly_added:
+                    self.worldCellBlock = None
+            elif doFilter:
+                # If we're Filter-tagged, check if the world cell block got
+                # filtered out
+                masters = MasterSet()
+                self.worldCellBlock.updateMasters(masters)
+                if not loadSetIsSuperset(masters):
+                    # The cell block got filtered out. If it was newly added,
+                    # we need to remove it from this block again.
+                    if was_newly_added:
+                        self.worldCellBlock = None
+        super(MobWorld, self).merge_records(block, loadSet, mergeIds,
+            iiSkipMerge, doFilter)
 
 #------------------------------------------------------------------------------
 class MobWorlds(MobBase):
@@ -1020,7 +1283,7 @@ class MobWorlds(MobBase):
         self.orphansSkipped = 0
         MobBase.__init__(self, header, loadFactory, ins, do_unpack)
 
-    def loadData(self,ins,endPos):
+    def load_rec_group(self, ins, endPos):
         """Loads data from input stream. Called by load()."""
         expType = self.label
         recWrldClass = self.loadFactory.getRecClass(expType)
@@ -1052,7 +1315,7 @@ class MobWorlds(MobBase):
                     #raise ModError(ins.inName,'Extra subgroup %d in WRLD
                     # group.' % groupType)
                     #--Orphaned world records. Skip over.
-                    insSeek(header.size - header.__class__.rec_header_size,1)
+                    insSeek(header.size - RecordHeader.rec_header_size,1)
                     self.orphansSkipped += 1
                     continue
                 if groupFid != world.fid:
@@ -1076,17 +1339,17 @@ class MobWorlds(MobBase):
     def dump(self,out):
         """Dumps group header and then records."""
         if not self.changed:
-            out.write(self.header.pack())
+            out.write(self.header.pack_head())
             out.write(self.data)
         else:
             if not self.worldBlocks: return
             worldHeaderPos = out.tell()
-            header = RecordHeader('GRUP', 0, self.label, 0, self.stamp)
-            out.write(header.pack())
-            totalSize = header.__class__.rec_header_size + sum(
+            header = TopGrupHeader(0, self.label, 0, self.stamp)
+            out.write(header.pack_head())
+            totalSize = RecordHeader.rec_header_size + sum(
                 x.dump(out) for x in self.worldBlocks)
             out.seek(worldHeaderPos + 4)
-            out.pack('I', totalSize)
+            out.pack(u'I', totalSize)
             out.seek(worldHeaderPos + totalSize)
 
     def getNumRecords(self,includeGroups=True):
@@ -1130,16 +1393,72 @@ class MobWorlds(MobBase):
             self.id_worldBlocks[fid].world = world
             self.id_worldBlocks[fid].worldCellBlock = worldcellblock
         else:
-            worldBlock = MobWorld(RecordHeader('GRUP',0,0,1,self.stamp),
-                                  self.loadFactory,world)
+            worldBlock = MobWorld(GrupHeader(0, 0, 1, self.stamp), ##: groupType = 1
+                                  self.loadFactory, world)
             worldBlock.setChanged()
             self.worldBlocks.append(worldBlock)
             self.id_worldBlocks[fid] = worldBlock
 
-    def keepRecords(self,keepIds):
-        """Keeps records with fid in set keepIds. Discards the rest."""
-        for worldBlock in self.worldBlocks: worldBlock.keepRecords(keepIds)
+    def remove_world(self, world):
+        """Removes the specified world from this block. The exact world object
+        must be present, otherwise a ValueError is raised."""
+        if self.worldBlocks and not self.id_worldBlocks:
+            self.indexRecords()
+        self.worldBlocks.remove(world)
+        del self.id_worldBlocks[world.fid]
+
+    def iter_records(self):
+        return chain.from_iterable(w.iter_records() for w in self.worldBlocks)
+
+    def keepRecords(self, p_keep_ids):
+        """Keeps records with fid in set p_keep_ids. Discards the rest."""
+        for worldBlock in self.worldBlocks: worldBlock.keepRecords(p_keep_ids)
         self.worldBlocks = [x for x in self.worldBlocks if
-                            x.world.fid in keepIds]
+                            x.world.fid in p_keep_ids]
         self.id_worldBlocks.clear()
         self.setChanged()
+
+    def merge_records(self, block, loadSet, mergeIds, iiSkipMerge, doFilter):
+        from .mod_files import MasterSet # YUCK
+        if self.worldBlocks and not self.id_worldBlocks:
+            self.indexRecords()
+        lookup_world_block = self.id_worldBlocks.get
+        filtered_world_blocks = []
+        filtered_append = filtered_world_blocks.append
+        loadSetIsSuperset = loadSet.issuperset
+        for src_world_block in block.worldBlocks:
+            was_newly_added = False
+            src_fid = src_world_block.world.fid
+            # Check if we already have a world with that FormID
+            dest_world_block = lookup_world_block(src_fid)
+            if not dest_world_block:
+                # We do not, add it and then look up again
+                ##: Shouldn't all the setWorld calls use getTypeCopy?
+                self.setWorld(src_world_block.world)
+                dest_world_block = lookup_world_block(src_fid)
+                was_newly_added = True
+            # Delegate merging to the (potentially newly added) child world
+            dest_world_block.merge_records(src_world_block, loadSet,
+                mergeIds, iiSkipMerge, doFilter)
+            # In IIM, skip all merging - note that we need to remove the child
+            # world again if it was newly added in IIM mode.
+            if iiSkipMerge:
+                if was_newly_added:
+                    self.remove_world(dest_world_block.world)
+                continue
+            # If we're Filter-tagged, check if the child world got filtered out
+            if doFilter:
+                masters = MasterSet()
+                src_world_block.updateMasters(masters)
+                if not loadSetIsSuperset(masters):
+                    # The child world got filtered out. If it was newly added,
+                    # we need to remove it from this block again. Otherwise, we
+                    # can just skip forward to the next child world.
+                    if was_newly_added:
+                        self.remove_world(dest_world_block.world)
+                    continue
+            # We're either not Filter-tagged or we want to keep this world
+            filtered_append(src_world_block)
+        # Apply any merge filtering we've done above to the record block
+        block.worldBlocks = filtered_world_blocks
+        block.indexRecords()

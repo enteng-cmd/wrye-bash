@@ -186,10 +186,7 @@ class PatchFile(_PFile, ModFile):
 
     def getKeeper(self):
         """Returns a function to add fids to self.keepIds."""
-        def keep(fid):
-            self.keepIds.add(fid)
-            return fid
-        return keep
+        return self.keepIds.add
 
     def initFactories(self,progress):
         """Gets load factories."""
@@ -260,51 +257,16 @@ class PatchFile(_PFile, ModFile):
 
     def mergeModFile(self,modFile,progress,doFilter,iiMode):
         """Copies contents of modFile into self."""
-        mergeIds = self.mergeIds
-        mergeIdsAdd = mergeIds.add
-        loadSet = self.loadSet
         modFile.convertToLongFids()
-        badForm = (GPath(u"Oblivion.esm"),0xA31D) #--DarkPCB record
-        selfLoadFactoryRecTypes = self.loadFactory.recTypes
-        selfMergeFactoryType_class = self.mergeFactory.type_class
-        selfReadFactoryAddClass = self.readFactory.addClass
-        selfLoadFactoryAddClass = self.loadFactory.addClass
-        nullFid = (bosh.modInfos.masterName, 0)
         for blockType,block in modFile.tops.iteritems():
-            iiSkipMerge = iiMode and blockType not in bush.game.listTypes
             #--Make sure block type is also in read and write factories
-            if blockType not in selfLoadFactoryRecTypes:
-                recClass = selfMergeFactoryType_class[blockType]
-                selfReadFactoryAddClass(recClass)
-                selfLoadFactoryAddClass(recClass)
-            patchBlock = getattr(self,blockType)
-            patchBlockSetRecord = patchBlock.setRecord
-            if not isinstance(patchBlock,MobObjects):
-                raise BoltError(u"Merge unsupported for type: "+blockType)
-            filtered = []
-            filteredAppend = filtered.append
-            loadSetIssuperset = loadSet.issuperset
-            for record in block.getActiveRecords():
-                fid = record.fid
-                if fid == badForm: continue
-                #--Include this record?
-                if doFilter:
-                    record.mergeFilter(loadSet)
-                    masters = MasterSet()
-                    record.updateMasters(masters)
-                    if not loadSetIssuperset(masters):
-                        continue
-                filteredAppend(record)
-                if iiSkipMerge: continue
-                record = record.getTypeCopy()
-                patchBlockSetRecord(record)
-                if record.isKeyedByEid and fid == nullFid:
-                    mergeIdsAdd(record.eid)
-                else:
-                    mergeIdsAdd(fid)
-            #--Filter records
-            block.records = filtered
-            block.indexRecords()
+            if blockType not in self.loadFactory.recTypes:
+                recClass = self.mergeFactory.type_class[blockType]
+                self.readFactory.addClass(recClass)
+                self.loadFactory.addClass(recClass)
+            iiSkipMerge = iiMode and blockType not in bush.game.listTypes
+            getattr(self, blockType).merge_records(block, self.loadSet,
+                self.mergeIds, iiSkipMerge, doFilter)
 
     def update_patch_records_from_mod(self, modFile):
         """Scans file and overwrites own records with modfile records."""
