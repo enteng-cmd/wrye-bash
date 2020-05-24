@@ -39,7 +39,7 @@ from .common_subrecords import MelEdid
 from .mod_io import RecordHeader, GrupHeader
 from .record_structs import MelRecord, MelSet, MreRecord
 from .utils_constants import FID
-from .. import bolt, exception
+from .. import bass, bolt, exception
 from ..bolt import decode, encode, GPath, sio
 from ..exception import StateError
 
@@ -211,9 +211,9 @@ class MreGmstBase(MelRecord):
         from .. import bosh # Late import to avoid circular imports
         if not cls.Ids:
             from .. import bush
-            fname = bush.game.pklfile
+            fname = bass.dirs[u'db'].join(bush.game.pklfile)
             try:
-                with open(fname) as pkl_file:
+                with fname.open(u'rb') as pkl_file:
                     cls.Ids = pickle.load(pkl_file)[cls.rec_sig]
             except:
                 old = bolt.deprintOn
