@@ -42,7 +42,7 @@ class _TopLevelWin(_AComponent):
      - _on_close_evt(): request to close the window."""
     _defPos = defPos
     _def_size = defSize
-    _size_key = _pos_key = None
+    _min_size = _size_key = _pos_key = None
 
     def __init__(self, parent, sizes_dict, icon_bundle, *args, **kwargs):
         # dict holding size/pos info ##: can be bass.settings or balt.sizes
@@ -52,6 +52,7 @@ class _TopLevelWin(_AComponent):
         self._on_close_evt = self._evt_handler(_wx.EVT_CLOSE)
         self._on_close_evt.subscribe(self.on_closing)
         if icon_bundle: self.set_icons(icon_bundle)
+        if self._min_size: self.set_min_size(*self._min_size)
 
     def _set_pos_size(self, kwargs, sizes_dict):
         kwargs['pos'] = kwargs.get('pos', None) or sizes_dict.get(
@@ -129,7 +130,6 @@ class WindowFrame(_TopLevelWin):
         self.on_activate = self._evt_handler(_wx.EVT_ACTIVATE,
                                              lambda event: [event.GetActive()])
         self.reset_background_color()
-        self.set_min_size(*self._min_size)
 
     def show_frame(self): self._native_widget.Show()
 
@@ -158,6 +158,7 @@ class DialogWindow(_TopLevelWin):
                                            title=self.title, style=style,
                                            **kwargs)
         self.on_size_changed = self._evt_handler(_wx.EVT_SIZE)
+        self.on_size_changed.subscribe(self.save_size) # save dialog size
 
     def save_size(self):
         if self._sizes_dict is not None and self._size_key:
