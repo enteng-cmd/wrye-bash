@@ -65,7 +65,8 @@ from operator import itemgetter
 import wx
 
 #--Local
-from .. import bush, bosh, bolt, bass, env, load_order, archives
+from .. import bush, bosh, bolt, bass, env, load_order, archives, \
+    initialization
 from ..bolt import GPath, SubProgress, deprint, round_size
 from ..bosh import omods
 from ..cint import CBashApi
@@ -1630,7 +1631,7 @@ class ModDetails(_ModsSavesDetails):
                 # We need to grab both the ones from the description and from
                 # LOOT, since we need to save a diff
                 plugin_name = mod_info.name
-                added, removed = bosh.lootDb.getTagsInfoCache(plugin_name)
+                added, removed = initialization.lootDb.getTagsInfoCache(plugin_name)
                 # Emulate the effects of applying the LOOT tags
                 old_tags = bashTagsDesc.copy()
                 old_tags |= added
@@ -3964,7 +3965,7 @@ class BashFrame(WindowFrame):
         self.inRefreshData = True
         popMods = popSaves = popBsas = None
         #--Config helpers
-        bosh.lootDb.refreshBashTags()
+        initialization.lootDb.refreshBashTags()
         #--Check bsas, needed to detect string files in modInfos refresh...
         bosh.oblivionIni.get_ini_language(cached=False) # reread ini language
         if not booting and bosh.bsaInfos.refresh():

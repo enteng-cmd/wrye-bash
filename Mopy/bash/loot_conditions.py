@@ -27,16 +27,16 @@ Wrye Bash. This file handles the evaluation of conditions.
 Recommended reading before working on this file:
 https://loot-api.readthedocs.io/en/latest/metadata/conditions.html."""
 
+__author__ = u'Infernio'
+
 import operator
 import re
 
-from .. import bass, bush
-from ..bolt import GPath, Path
-from ..env import get_file_version
-from ..exception import AbstractError, ParserError, FileError
-from ..load_order import cached_active_tuple, cached_is_active, in_master_block
-
-__author__ = u'Infernio'
+from . import bass, bush
+from .bolt import GPath, Path
+from .env import get_file_version
+from .exception import AbstractError, ParserError, FileError
+from .load_order import cached_active_tuple, cached_is_active, in_master_block
 
 # Conditions
 class _ACondition(object):
@@ -177,7 +177,7 @@ def _fn_is_master(file_path):
 
     :param file_path: The file path to check."""
     plugin_path = GPath(file_path)
-    from . import modInfos
+    from .bosh import modInfos
     # Need to check if it's on disk first, otherwise modInfos[x] errors
     return plugin_path in modInfos and in_master_block(modInfos[plugin_path])
 
@@ -258,7 +258,7 @@ def _fn_version(file_path, expected_ver, comparison):
     if file_path.isfile():
         if file_path.cext in bush.game.espm_extensions:
             # Read version from the description
-            from . import modInfos
+            from .bosh import modInfos
             ver_match = _VERSION_REGEX.search(
                 modInfos[GPath(file_path.tail)].header.description)
             if ver_match:

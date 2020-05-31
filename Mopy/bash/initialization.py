@@ -24,6 +24,7 @@
 """Functions for initializing Bash data structures on boot. For now exports
 functions to initialize bass.dirs that need be initialized high up into the
 boot sequence to be able to backup/restore settings."""
+import os
 from ConfigParser import ConfigParser, MissingSectionHeaderError
 # Local - don't import anything else
 from . import env
@@ -31,8 +32,11 @@ from .bass import dirs, get_ini_option
 from .bolt import GPath, Path, getbestencoding
 from .env import get_personal_path, get_local_app_data_path
 from .exception import BoltError, NonExistentDriveError
+from .loot_parser import LOOTParser # FIXME imports bosh
 
 mopy_dirs_initialized = bash_dirs_initialized = False
+#--Config Helper files (LOOT Master List, etc.)
+lootDb = None # type: LOOTParser
 
 def get_path_from_ini(bash_ini_, option_key, section_key=u'General'):
     get_value = get_ini_option(bash_ini_, option_key, section_key)
@@ -256,6 +260,12 @@ def init_dirs(bashIni_, personal, localAppData, game_info):
                              u'symbolic links or NTFS Junctions') + u':\n\n'
             msg += u'\n'.join([u'%s' % x for x in relativePathError])
         raise BoltError(msg)
+    loot_path = dirs[u'userApp'].join(os.pardir, u'LOOT', game_info.fsName)
+    lootMasterPath = loot_path.join(u'masterlist.yaml')
+    lootUserPath = loot_path.join(u'userlist.yaml')
+    tagList = dirs[u'defaultPatches'].join(u'taglist.yaml')
+    global lootDb
+    lootDb = LOOTParser(lootMasterPath, lootUserPath, tagList)
     global bash_dirs_initialized
     bash_dirs_initialized = True
     return game_ini_path, init_warnings

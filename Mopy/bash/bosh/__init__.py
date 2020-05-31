@@ -43,7 +43,6 @@ from functools import wraps, partial
 from itertools import imap
 #--Local
 from ._mergeability import isPBashMergeable, isCBashMergeable, is_esl_capable
-from .loot_parser import LOOTParser, libloot_version
 from .mods_metadata import get_tags_from_dir
 from .. import bass, bolt, balt, bush, env, load_order, archives, \
     initialization
@@ -55,7 +54,7 @@ from ..bolt import GPath, DataDict, deprint, sio, Path, decode, struct_pack, \
 from ..brec import MreRecord, ModReader, RecordHeader
 from ..cint import CBashApi
 from ..exception import AbstractError, ArgumentError, BoltError, BSAError, \
-    CancelError, DDSError, FileError, ModError, PluginsFullError, \
+    CancelError, FileError, ModError, PluginsFullError, \
     SaveFileError, SaveHeaderError, SkipError, StateError
 from ..ini_files import IniFile, OBSEIniFile, DefaultIniFile, GameIni, \
     get_ini_type_and_encoding
@@ -89,8 +88,6 @@ saveInfos = None   # type: SaveInfos
 iniInfos = None    # type: INIInfos
 bsaInfos = None    # type: BSAInfos
 screen_infos = None # type: ScreenInfos
-#--Config Helper files (LOOT Master List, etc.)
-lootDb = None # type: LOOTParser
 
 #--Header tags
 reVersion = re.compile(
@@ -552,7 +549,7 @@ class ModInfo(FileInfo):
         tags = set()
         tags |= self.getBashTagsDesc()
         # Tags from LOOT take precendence over the description
-        added, removed = lootDb.getTagsInfoCache(self.name)
+        added, removed = initialization.lootDb.getTagsInfoCache(self.name)
         tags |= added
         tags -= removed
         # Tags from Data/BashTags/{self.name}.txt take precedence over both
@@ -2266,7 +2263,7 @@ class ModInfos(FileInfos):
         if tags_desc:
             tagList = _tags(_(u'From Plugin Description: '), sorted(tags_desc),
                             tagList)
-        tags, removed = lootDb.getTagsInfoCache(mname)
+        tags, removed = initialization.lootDb.getTagsInfoCache(mname)
         if tags:
             tagList = _tags(_(u'From LOOT Masterlist and / or Userlist: '),
                             sorted(tags), tagList)
@@ -2472,7 +2469,7 @@ class ModInfos(FileInfos):
         """Returns a dirty message from LOOT."""
         if self.table.getItem(modname, 'ignoreDirty', False):
             return False, u''
-        if lootDb.is_plugin_dirty(modname, self):
+        if initialization.lootDb.is_plugin_dirty(modname, self):
             return True, u'Contains dirty edits, needs cleaning.'
         return False, u''
 
@@ -3280,14 +3277,6 @@ def initBosh(bashIni, game_ini_path):
     # Setup loot_parser, needs to be done after the dirs are initialized
     if not initialization.bash_dirs_initialized:
         raise BoltError(u'initBosh: Bash dirs are not initialized')
-    loot_path = bass.dirs['userApp'].join(os.pardir, u'LOOT', bush.game.fsName)
-    lootMasterPath = loot_path.join(u'masterlist.yaml')
-    lootUserPath = loot_path.join(u'userlist.yaml')
-    tagList = bass.dirs['defaultPatches'].join(u'taglist.yaml')
-    global lootDb
-    lootDb = LOOTParser(lootMasterPath, lootUserPath, tagList)
-    deprint(u'Initialized loot_parser, compatible with libloot '
-            u'v%s' % libloot_version)
     # game ini files
     deprint(u'Looking for main game INI at %s' % game_ini_path)
     global oblivionIni, gameInis

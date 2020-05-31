@@ -30,8 +30,8 @@ Bash to use, so must be imported and run high up in the booting sequence.
 # Imports ---------------------------------------------------------------------
 import collections
 import textwrap
-from . import game as game_init
 from . import bass
+from . import game as game_init
 from .bolt import GPath, Path, deprint
 from .env import get_registry_game_path
 from .exception import BoltError
