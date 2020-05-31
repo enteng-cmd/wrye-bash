@@ -1040,16 +1040,6 @@ class _Mod_Patch_Update(_Mod_BP_Link):
         patch_files.executing_patch = self._selected_item
         mods_prior_to_patch = load_order.cached_lower_loading_espms(
             self._selected_item)
-        if bush.game.Esp.canCBash:
-            # If the game has CBash capabilities we *have* to rescan each time
-            # or we may end up in a situation where a user decides to use the
-            # '-P' CLI parameter to disable CBash and build a PBash patch using
-            # the cached mergeability information - which now contains
-            # mergeable mods that PBash can't handle!
-            ##: We can drop this once PBash and CBash are equally capable
-            bosh.modInfos.rescanMergeable(mods_prior_to_patch,
-                                          doCBash=self.doCBash)
-            self.window.RefreshUI(refreshSaves=False) # rescanned mergeable
         #--Check if we should be deactivating some plugins
         active_prior_to_patch = [x for x in mods_prior_to_patch if
                                  load_order.cached_is_active(x)]
@@ -1319,13 +1309,13 @@ class Mod_ScanDirty(ItemLink):
             + u'\n')
         # Change a FID to something more usefull for displaying
         if bass.settings['bash.CBashEnabled']:
-            def strFid(fid):
-                return u'%s: %06X' % (fid[0],fid[1])
+            def strFid(form_id):
+                return u'%s: %06X' % (form_id[0], form_id[1])
         else:
-            def strFid(fid):
-                modId = (0xFF000000 & fid) >> 24
+            def strFid(form_id):
+                modId = (0xFF000000 & form_id) >> 24
                 modName = modInfo.masterNames[modId]
-                id_ = 0x00FFFFFF & fid
+                id_ = 0x00FFFFFF & form_id
                 return u'%s: %06X' % (modName,id_)
         dirty = []
         clean = []
@@ -1368,8 +1358,8 @@ class Mod_ScanDirty(ItemLink):
                 if not bass.settings['bash.CBashEnabled']: continue
                 if itms:
                     dirty[pos] += u'  * %s: %i\n' % (_(u'ITM'),len(itms))
-                for fid in sorted(itms):
-                    dirty[pos] += u'    * %s\n' % strFid(fid)
+                for fi in sorted(itms):
+                    dirty[pos] += u'    * %s\n' % strFid(fi)
             elif udrs is None or itms is None:
                 error.append(u'* __'+modInfo.name.s+u'__')
             else:
